@@ -1,0 +1,5 @@
+{
+  "chatledger.exportDirectory": ".chatledger",
+  "chatledger.enabled": true,
+  "makefile.configureOnOpen": false
+}

@@ -1,0 +1,48 @@
+name: Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+          cache: true
+
+      - name: Run Unit Tests (No Pandoc)
+        run: |
+          echo "Running logic tests without Pandoc..."
+          # Run specific packages that should pass without external binaries
+          go test -v ./internal/utils/... ./internal/config/... ./internal/templates/...
+
+          # Verify app fails gracefully if we try to run it?
+          # Verify CheckPandoc returns false
+          # We can run a small test to confirm absence:
+          if command -v pandoc >/dev/null 2>&1; then
+            echo "Error: Pandoc should not be installed yet"
+            exit 1
+          fi
+
+      - name: Install Pandoc
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pandoc
+          pandoc --version
+
+      - name: Run All Tests (With Pandoc)
+        run: go test -v ./... -coverprofile=coverage.out
+
+      - name: Check Code Coverage
+        run: go tool cover -func=coverage.out

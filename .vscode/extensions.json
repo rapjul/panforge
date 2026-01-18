@@ -1,0 +1,8 @@
+{
+  "recommendations": [
+    "golang.go",
+    "ms-vscode.makefile-tools",
+    "github.vscode-github-actions",
+    "codezombiech.gitignore"
+  ]
+}

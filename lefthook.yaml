@@ -1,0 +1,12 @@
+# lefthook.yaml
+
+pre-commit:
+  parallel: true
+  commands:
+    golangci-lint:
+      run: golangci-lint run --fast
+    go-fmt:
+      run: go fmt ./...
+    check-yaml:
+      glob: "*.{yaml,yml}"
+      run: yamlfmt -lint {staged_files}

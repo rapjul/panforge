@@ -1,0 +1,78 @@
+## Default Configuration for panforge
+## Place this file in your project root or home directory as .panforge.yaml
+
+title: "My Project"
+author: "Your Name"
+# date: "2024-01-01" # Optional, defaults to today if auto-filename-date is true
+
+## Auto-generate filenames
+## Available variables: {date}, {time}, {title}, {author}, {slug}, {ext}, and any other variable that can be used in a filename
+## The {ext} variable will be replaced by each output format's extension
+filename-template: "{title}_{date}.{ext}" # default template
+# filename-template: "{title} - {author} ({date}).{ext}" # alternative template
+
+## Slugify filenames? (e.g. "My Document" -> "my-document")
+# slugify-filename: true
+
+## Input format (e.g. markdown, markdown+hard_line_breaks, gfm, etc.)
+# from: markdown+hard_line_breaks # Optional, defaults to markdown
+
+## Run Options (To Be Implemented?)
+# run:
+#   dry-run: true # Optional, defaults to false
+#   watch: true # Optional, defaults to false
+
+## List of formats to generate.
+## These keys correspond to entries in your .panforge.yaml or the names of Pandoc output formats.
+## To see a list of available output formats, run `pandoc --list-output-formats`.
+##
+## Example:
+## outputs:
+##   - pdf
+##   - html
+##
+## Default: pdf
+##
+
+## Default Output Configurations
+## These can be referenced in your Markdown frontmatter by key (e.g. "html", "pdf")
+output:
+  pdf:
+    # to: pdf
+    pdf-engine: xelatex
+    # template: template.tex
+    documentclass: article # Document class
+    font: times # Use Times New Roman font
+    base-font-size: 12pt # Base font size
+    embed-fonts: true # Embed fonts in the PDF
+    toc: true # Generate a table of contents
+    toc-depth: 2 # Table of contents depth
+    toc-title: "Table of Contents" # Table of contents title
+    template: default.latex # Use a custom LaTeX template
+    include-in-header: header.tex # Include a custom header
+    include-in-footer: footer.tex # Include a custom footer
+    colorlinks: true # Use color links
+    geometry: margin=2cm # Page geometry
+    header-includes: |
+      \usepackage{hyperref}
+      % \usepackage{geometry}
+      % \geometry{margin=2cm}
+  html:
+    # to: html5
+    standalone: true
+    # css: style.css
+    # toc: true # Generate a table of contents
+    number-sections: true # Number sections
+    # css: style.css # Apply custom CSS
+  epub:
+    # to: epub
+    standalone: true # Generate a standalone EPUB file
+    toc: true # Generate a table of contents
+    cover-image: cover.jpg # Optional cover image
+    top-level-division: chapter # Optional top-level division (chapter or section)
+    split-level: 2 # Optional split level (1 or 2)
+    language: en # Optional language (e.g. en, fr, es, etc.)
+    output-profile: epub2 # Optional output profile (epub2 or epub3)
+  docx:
+    # to: docx
+    reference-doc: reference.docx # Optional reference document to inherit styles from (e.g. font family, font size, etc.)
