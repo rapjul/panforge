@@ -35,10 +35,12 @@ jobs:
             exit 1
           fi
 
-      - name: Install Pandoc
+      - name: Install Pandoc and LaTeX
         run: |
           sudo apt-get update
-          sudo apt-get install -y pandoc
+          sudo apt-get install -y texlive-latex-base texlive-fonts-recommended texlive-latex-extra
+          wget https://github.com/jgm/pandoc/releases/download/3.8.3/pandoc-3.8.3-1-amd64.deb
+          sudo dpkg -i pandoc-3.8.3-1-amd64.deb
           pandoc --version
 
       - name: Run All Tests (With Pandoc)

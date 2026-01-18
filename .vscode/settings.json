@@ -1,5 +1,17 @@
 {
+  "files.associations": {
+    ".yamlfmt": "yaml"
+  },
+  "files.exclude": {
+    "_*": true,
+    ".chatledger": true,
+    ".goreleaser.yaml": false,
+    ".yamlfmt": false,
+    ".vscode": false,
+    "vendor": true
+  },
+  "explorer.excludeGitIgnore": true,
   "chatledger.exportDirectory": ".chatledger",
   "chatledger.enabled": true,
-  "makefile.configureOnOpen": false
+  "makefile.configureOnOpen": false,
 }

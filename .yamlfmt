@@ -1,6 +1,7 @@
 continue_on_error: false
 doublestar: false
-exclude: []
+exclude:
+  - .goreleaser.yaml
 extensions:
   - yaml
   - yml
