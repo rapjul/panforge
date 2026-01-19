@@ -1,7 +1,8 @@
-continue_on_error: false
-doublestar: false
+continue_on_error: true
+doublestar: true
 exclude:
   - .goreleaser.yaml
+  - vendor/**/*
 extensions:
   - yaml
   - yml
