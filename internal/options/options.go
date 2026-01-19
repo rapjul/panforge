@@ -1,3 +1,4 @@
+// Package options defines the available command-line flags and arguments.
 package options
 
 import "log/slog"

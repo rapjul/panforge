@@ -10,8 +10,8 @@ func TestRunInit(t *testing.T) {
 	// Setup temp dir
 	tmpDir := t.TempDir()
 	origWd, _ := os.Getwd()
-	os.Chdir(tmpDir)
-	defer os.Chdir(origWd)
+	_ = os.Chdir(tmpDir)
+	defer func() { _ = os.Chdir(origWd) }()
 
 	t.Run("GenerateConfig", func(t *testing.T) {
 		err := RunInit(InitOptions{Config: true})
@@ -44,18 +44,21 @@ func TestRunInit(t *testing.T) {
 	})
 
 	t.Run("FileExistsError", func(t *testing.T) {
-		// Create file first
-		os.WriteFile("input.md", []byte("exists"), 0644)
+		// Create input file
+		_ = os.WriteFile("input.md", []byte("exists"), 0600)
 
 		err := RunInit(InitOptions{Markdown: true})
 		if err == nil {
 			t.Error("expected error when file exists, got nil")
 		}
+		if err != nil && !strings.Contains(err.Error(), "already exists") {
+			t.Errorf("expected 'already exists' error, got %v", err)
+		}
 	})
 
-	t.Run("FileExistsForce", func(t *testing.T) {
-		// Create file first
-		os.WriteFile("input.md", []byte("exists"), 0644)
+	t.Run("OverwriteExistingFiles", func(t *testing.T) {
+		// Create input file
+		_ = os.WriteFile("input.md", []byte("exists"), 0600)
 
 		err := RunInit(InitOptions{Markdown: true, Force: true})
 		if err != nil {

@@ -1,3 +1,4 @@
+// Package config handles proper configuration loading and validation.
 package config
 
 import (
@@ -42,6 +43,7 @@ func LoadConfig(path string) (string, *Config, error) {
 	if err != nil {
 		absPath = path // fallback
 	}
+	//nolint:gosec // G304: Potential file inclusion via variable is intended behavior for CLI file arguments
 	data, err := os.ReadFile(absPath)
 	if err != nil {
 		return "", nil, err

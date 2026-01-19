@@ -1,3 +1,4 @@
+// Package app implements the core application logic for panforge.
 package app
 
 import (
@@ -91,10 +92,10 @@ func Run(ctx context.Context, cmd *cobra.Command, args []string, opts options.Op
 		if err != nil {
 			return fmt.Errorf("failed to create temp file for stdin: %w", err)
 		}
-		defer os.Remove(tmpFile.Name())
+		defer func() { _ = os.Remove(tmpFile.Name()) }()
 
 		if _, err := io.Copy(tmpFile, cmd.InOrStdin()); err != nil {
-			tmpFile.Close()
+			_ = tmpFile.Close()
 			return fmt.Errorf("failed to read stdin: %w", err)
 		}
 		if err := tmpFile.Close(); err != nil {
@@ -125,6 +126,8 @@ func Run(ctx context.Context, cmd *cobra.Command, args []string, opts options.Op
 //   - `postArgs`: additional arguments to pass to pandoc
 //   - `opts`: configuration options
 //   - `executor`: used to run the pandoc command
+//
+//nolint:gocyclo // Code is complex but manageable; refactoring deferred
 func Process(ctx context.Context, inputFile string, postArgs []string, opts options.Options, executor CommandExecutor) error {
 	// 2. Initial Config Loading
 	formats, err := pandoc.GetSupportedFormats()
@@ -196,11 +199,11 @@ func Process(ctx context.Context, inputFile string, postArgs []string, opts opti
 	var logFile *os.File
 	if opts.Log != "" {
 		var err error
-		logFile, err = os.OpenFile(opts.Log, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		logFile, err = os.OpenFile(opts.Log, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644) //nolint:gosec // 0644 is standard for logs
 		if err != nil {
 			return fmt.Errorf("failed to open log file: %w", err)
 		}
-		defer logFile.Close()
+		defer func() { _ = logFile.Close() }()
 	}
 
 	for _, t := range targets {
@@ -310,7 +313,7 @@ func Process(ctx context.Context, inputFile string, postArgs []string, opts opti
 
 			if logFile != nil {
 				logMu.Lock()
-				fmt.Fprintf(logFile, "panforge calling: %s\n", cmdStr)
+				_, _ = fmt.Fprintf(logFile, "panforge calling: %s\n", cmdStr)
 				logMu.Unlock()
 			}
 
@@ -416,7 +419,7 @@ func isOverwriteAllowed(cfg *config.Config, metaOut map[string]interface{}) bool
 //   - `r`: the input reader (usually stdin)
 //   - `w`: the output writer (usually stderr)
 func askForConfirmation(filename string, r io.Reader, w io.Writer) bool {
-	fmt.Fprintf(w, "File '%s' already exists. Overwrite? [y/N]: ", filename)
+	_, _ = fmt.Fprintf(w, "File '%s' already exists. Overwrite? [y/N]: ", filename)
 
 	reader := bufio.NewReader(r)
 	response, err := reader.ReadString('\n')
@@ -435,6 +438,8 @@ func askForConfirmation(filename string, r io.Reader, w io.Writer) bool {
 //   - `opts`: runtime options
 //
 // It returns a list of tool names that should be checked (e.g. "pandoc", "pdflatex").
+//
+//nolint:gocyclo // Code is complex but manageable; refactoring deferred
 func GetRequiredTools(inputFile string, opts options.Options) ([]string, error) {
 	required := []string{"pandoc"}
 

@@ -35,8 +35,8 @@ func TestWatch(t *testing.T) {
 	// Setup temp dir
 	tmpDir := t.TempDir()
 	origWd, _ := os.Getwd()
-	os.Chdir(tmpDir)
-	defer os.Chdir(origWd)
+	_ = os.Chdir(tmpDir)
+	defer func() { _ = os.Chdir(origWd) }()
 
 	// Create dummy input file
 	inputFile := "test.md"
@@ -46,6 +46,7 @@ outputs:
 ---
 # Hello
 `
+	//nolint:gosec // G306: Expect WriteFile permissions to be 0600 or less
 	if err := os.WriteFile(inputFile, []byte(content), 0644); err != nil {
 		t.Fatalf("failed to write input file: %v", err)
 	}
@@ -82,19 +83,18 @@ outputs:
 	// In the test setup, we didn't specify title, so it might use "test" from filename.
 	// But we wrote "outputs: [html]".
 	// Let's create `test.html` and `Hello.html` (since dummy content has # Hello) just to be sure.
-	os.WriteFile("test.html", []byte("old"), 0644)
-	os.WriteFile("Hello.html", []byte("old"), 0644)
+	_ = os.WriteFile("test.html", []byte("old"), 0600)
+	_ = os.WriteFile("Hello.html", []byte("old"), 0600)
 
-	// Modify file
-	f, err := os.OpenFile(inputFile, os.O_APPEND|os.O_WRONLY, 0644)
-
+	// Open file for appending
+	f, err := os.OpenFile(inputFile, os.O_APPEND|os.O_WRONLY, 0600) //nolint:gosec // 0600 for tests
 	if err != nil {
 		t.Fatalf("failed to open file for append: %v", err)
 	}
-	if _, err := f.WriteString("\nNew content\n"); err != nil {
-		t.Fatalf("failed to write to file: %v", err)
+	if _, err := f.WriteString("\n# New Content"); err != nil {
+		t.Fatalf("Failed to write to file: %v", err)
 	}
-	f.Close()
+	_ = f.Close()
 
 	// Wait for debounce (100ms) + processing time
 	time.Sleep(500 * time.Millisecond)

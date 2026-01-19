@@ -1,3 +1,4 @@
+// Package templates manages embedded resources and file generation.
 package templates
 
 import (

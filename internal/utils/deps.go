@@ -1,3 +1,4 @@
+// Package utils contains common helper functions used across the application.
 package utils
 
 import (
@@ -48,6 +49,7 @@ func CheckTool(name string, versionFlag string) CheckResult {
 	flags := []string{"--version", "-version", "version"}
 
 	for _, flag := range flags {
+		//nolint:gosec // G204: Subprocess launched with variable is intended for tool checking
 		cmd := exec.Command(name, flag)
 		out, err := cmd.Output()
 		if err == nil {

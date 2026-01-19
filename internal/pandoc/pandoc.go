@@ -1,3 +1,4 @@
+// Package pandoc provides interfaces and utilities for interacting with the Pandoc CLI.
 package pandoc
 
 import (
@@ -64,6 +65,7 @@ func NormalizeFormat(spec string) string {
 //   - string: the corresponding file extension (e.g. "tex")
 func ExtForFormat(fmtStr string) string {
 	fmtStr = strings.ToLower(fmtStr)
+	const pdfExt = "pdf"
 	switch fmtStr {
 	case "html", "html5":
 		return "html"
@@ -75,10 +77,10 @@ func ExtForFormat(fmtStr string) string {
 		return "md"
 	case "latex", "tex":
 		return "tex"
-	case "pdf":
-		return "pdf"
+	case pdfExt:
+		return pdfExt
 	case "beamer":
-		return "pdf" // Simplified assumption, often pdf output
+		return pdfExt // Simplified assumption, often pdf output
 	default:
 		return fmtStr
 	}
@@ -124,7 +126,8 @@ func GenerateOutputFilename(inputFile string, cfg *config.Config, metaOut map[st
 
 	title := cfg.Title
 	if title == "" {
-		// try to read title from first heading of input file
+		// try to read title from first heading of	// Determine title/date
+		//nolint:gosec // G304: Potential file inclusion via variable is intended behavior
 		content, _ := os.ReadFile(inputFile) // ignore error
 		lines := strings.Split(string(content), "\n")
 		for _, line := range lines {

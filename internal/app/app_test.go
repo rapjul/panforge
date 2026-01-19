@@ -39,12 +39,15 @@ func (t *TestExecutor) Run(ctx context.Context, name string, args []string, stdo
 
 func TestRun_PostArgs_ToFlagConversion(t *testing.T) {
 	// Create a temp file to simulate input
+	// Use os.WriteFile to specify permissions and ensure content
 	tmpFile, err := os.CreateTemp("", "test-*.md")
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
-	defer os.Remove(tmpFile.Name())
-	tmpFile.Close()
+	defer func() { _ = os.Remove(tmpFile.Name()) }()
+	if err := tmpFile.Close(); err != nil { // Handle close error
+		t.Fatalf("Failed to close temp file: %v", err)
+	}
 
 	// Setup
 	executor := &TestExecutor{}
@@ -103,8 +106,8 @@ func TestRun_Stdin(t *testing.T) {
 	// Mock Stdin
 	inputContent := "# Hello Stdin"
 	r, w, _ := os.Pipe()
-	w.Write([]byte(inputContent))
-	w.Close()
+	_, _ = w.Write([]byte(inputContent))
+	_ = w.Close()
 	// Restore old stdin logic if we were replacing os.Stdin, but here we use cmd.SetIn
 	cmd.SetIn(r)
 
@@ -135,8 +138,8 @@ func TestRun_ExecutionError(t *testing.T) {
 	}
 
 	tmpFile, _ := os.CreateTemp("", "test-*.md")
-	defer os.Remove(tmpFile.Name())
-	tmpFile.Close()
+	defer func() { _ = os.Remove(tmpFile.Name()) }()
+	_ = tmpFile.Close()
 
 	cmd := &cobra.Command{}
 	cmd.SetOut(io.Discard)

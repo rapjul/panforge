@@ -26,7 +26,7 @@ func Watch(ctx context.Context, inputFile string, configFile string, postArgs []
 	if err != nil {
 		return fmt.Errorf("failed to create watcher: %w", err)
 	}
-	defer watcher.Close()
+	defer func() { _ = watcher.Close() }()
 
 	// Add input file to watcher
 	if err := watcher.Add(inputFile); err != nil {
@@ -89,9 +89,10 @@ func Watch(ctx context.Context, inputFile string, configFile string, postArgs []
 					}
 
 					// Re-add watches if they were removed (atomic save)
-					watcher.Add(inputFile)
+					// Add input file to watcher
+					_ = watcher.Add(inputFile)
 					if configFile != "" {
-						watcher.Add(configFile)
+						_ = watcher.Add(configFile)
 					}
 
 					if err := Process(ctx, inputFile, postArgs, opts, executor); err != nil {

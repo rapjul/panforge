@@ -89,7 +89,8 @@ func createFile(filename string, content string, force bool) error {
 		}
 	}
 
-	// Write file
+	// Write config file
+	//nolint:gosec // G306: Expect WriteFile permissions to be 0600 or less (config file should be readable)
 	if err := os.WriteFile(filename, []byte(content), 0644); err != nil {
 		return fmt.Errorf("failed to write %s: %w", filename, err)
 	}

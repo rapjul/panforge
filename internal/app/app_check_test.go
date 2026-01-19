@@ -3,14 +3,14 @@ package app
 import (
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/rapjul/panforge/internal/options"
 )
 
 func TestGetRequiredTools(t *testing.T) {
-	tmpDir := t.TempDir()
+	// Setup temp dir
+	// tmpDir := t.TempDir() // Not used directly, using t.TempDir() in loop
 
 	tests := []struct {
 		name          string
@@ -64,8 +64,8 @@ outputs:
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tmpFile := filepath.Join(tmpDir, strings.ReplaceAll(tt.name, " ", "_")+".md")
-			err := os.WriteFile(tmpFile, []byte(tt.yamlContent), 0644)
+			tmpFile := filepath.Join(t.TempDir(), "config.yaml")
+			err := os.WriteFile(tmpFile, []byte(tt.yamlContent), 0600) //nolint:gosec // 0600 for tests
 			if err != nil {
 				t.Fatalf("failed to create temp file: %v", err)
 			}
