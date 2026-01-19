@@ -24,7 +24,7 @@ release: ## Create a release and push it to GitHub (requires goreleaser)
 	goreleaser release --clean
 
 release-simulate: ## Create a simulated release (for local testing) and build for all target systems (requires goreleaser)
-	goreleaser release --snapshot --skip-publish --clean
+	goreleaser release --snapshot --clean
 
 clean: ## Clean up build artifacts and remove the binary
 	rm -f panforge
