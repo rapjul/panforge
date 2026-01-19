@@ -140,7 +140,7 @@ _antigravity/
 .panforge.yaml
 
 # Binaries
-panforge
+/panforge
 
 # Build Artifacts
 dist/
