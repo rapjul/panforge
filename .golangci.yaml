@@ -1,0 +1,50 @@
+version: "2"
+
+run:
+  timeout: 5m
+
+output:
+  # Sort results by: filepath, line and column.
+  # This ensures deterministic output, which is crucial for CI cache stability and readability.
+  sort-results: true
+  # Print lines of code with issues.
+  print-issued-lines: true
+  # Print linter name in the end of issue text.
+  print-linter-name: true
+
+linters:
+  enable:
+    # --- Quality & Bugs ---
+    - gocritic # Extensive checks for bugs, performance, and style.
+    - gosec # Security scanner for Go.
+    - wastedassign # Finds wasted assignment statements (replaces ineffassign).
+    - errcheck # MANDATORY. Ensures error checks.
+    - staticcheck # "Go vet on steroids".
+    - govet # Official Go tool.
+    - unused # Finds unused code.
+
+    # --- Style ---
+    - revive # Enforces style guides (replacement for golint).
+    - misspell # Check for typos.
+    - whitespace # Check for unnecessary newlines.
+    - goconst # Repeated string constants.
+    - gocyclo # Cyclomatic complexity.
+
+  # Explicitly disable all linters by default to have full control over what is enabled.
+  default: none
+
+  settings:
+    revive:
+      rules:
+        - name: exported
+        - name: package-comments
+    gosec:
+      excludes:
+        - G104 # duplicate of errcheck
+
+issues:
+  # disable limits on issue reporting
+  # by default, it handles only 50 issues.
+  # We want to see all errors in CI to fix them all at once.
+  max-issues-per-linter: 0
+  max-same-issues: 0
