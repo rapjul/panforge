@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"sort"
 	"strings"
@@ -239,7 +240,9 @@ func Process(ctx context.Context, inputFile string, postArgs []string, opts opti
 			}
 
 			// Validate metadata (check for existence of referenced files)
-			if err := pandoc.ValidateMetadata(metaOut); err != nil {
+			// Determine baseDir from inputFile
+			baseDir := filepath.Dir(inputFile)
+			if err := pandoc.ValidateMetadata(metaOut, baseDir); err != nil {
 				return err
 			}
 

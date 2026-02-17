@@ -34,20 +34,14 @@ func TestValidateMetadata_RelativePathRepro(t *testing.T) {
 		"epub-cover-image": "cover.jpg",
 	}
 
-	// 3. Current ValidateMetadata (without baseDir) checks relative to CWD.
-	// Since we are NOT in projectDir, this should fail if the bug exists.
-	// Note: If we were lucky and CWD happened to have cover.jpg, it would pass, but highly unlikely in test env.
+	// 3. New ValidateMetadata (with baseDir) checks relative to baseDir.
+	// We pass projectDir as the baseDir since input.md would be there.
 
-	err = ValidateMetadata(meta)
+	err = ValidateMetadata(meta, projectDir)
 
-	// The user says "command says the cover image is not found", so we EXPECT an error here currently.
-	// If the code was correct (resolving relative to input file), we'd need to pass the baseDir.
-	// But since the current code DOES NOT take baseDir, it looks for "cover.jpg" in CWD.
-	// So we expect this to fail.
-
-	if err == nil {
-		t.Error("Expected error because cover.jpg is not in CWD, but got nil")
+	if err != nil {
+		t.Errorf("Expected nil error when checking relative path with baseDir, but got: %v", err)
 	} else {
-		t.Logf("Got expected error (reproduction success): %v", err)
+		t.Log("Successfully validated relative path with baseDir")
 	}
 }

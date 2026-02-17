@@ -9,7 +9,8 @@ import (
 
 // ValidateMetadata checks that file paths in the metadata exist.
 // It skips URLs and handles both single strings and lists of strings.
-func ValidateMetadata(meta map[string]interface{}) error {
+// baseDir is used to resolve relative paths. Absolute paths ignore baseDir.
+func ValidateMetadata(meta map[string]interface{}, baseDir string) error {
 	// Map keys to their validation logic
 	// ValidatorFile: inputs that must be files (or URLs if supported)
 	files := []string{
@@ -28,11 +29,28 @@ func ValidateMetadata(meta map[string]interface{}) error {
 	// ValidatorParentDir: output files where parent must exist
 	parentDirs := []string{"output", "o", "log", "log-file"}
 
+	// Helper to create a validator with baseDir
+	makeFileValidator := func(base string) validatorFunc {
+		return func(path string) error {
+			return validateFile(path, base)
+		}
+	}
+	makeDirValidator := func(base string) validatorFunc {
+		return func(path string) error {
+			return validateDir(path, base)
+		}
+	}
+	makeParentDirValidator := func(base string) validatorFunc {
+		return func(path string) error {
+			return validateParentDir(path, base)
+		}
+	}
+
 	for k, v := range meta {
 		// Check files
 		for _, key := range files {
 			if k == key {
-				if err := validateGeneric(v, validateFile); err != nil {
+				if err := validateGeneric(v, makeFileValidator(baseDir)); err != nil {
 					return fmt.Errorf("invalid path for key '%s': %w", k, err)
 				}
 			}
@@ -41,7 +59,7 @@ func ValidateMetadata(meta map[string]interface{}) error {
 		// Check dirs
 		for _, key := range dirs {
 			if k == key {
-				if err := validateGeneric(v, validateDir); err != nil {
+				if err := validateGeneric(v, makeDirValidator(baseDir)); err != nil {
 					return fmt.Errorf("invalid directory for key '%s': %w", k, err)
 				}
 			}
@@ -50,7 +68,7 @@ func ValidateMetadata(meta map[string]interface{}) error {
 		// Check path lists
 		for _, key := range pathLists {
 			if k == key {
-				if err := validatePathList(v); err != nil {
+				if err := validatePathList(v, baseDir); err != nil {
 					return fmt.Errorf("invalid resource path for key '%s': %w", k, err)
 				}
 			}
@@ -59,7 +77,7 @@ func ValidateMetadata(meta map[string]interface{}) error {
 		// Check parent dirs
 		for _, key := range parentDirs {
 			if k == key {
-				if err := validateGeneric(v, validateParentDir); err != nil {
+				if err := validateGeneric(v, makeParentDirValidator(baseDir)); err != nil {
 					return fmt.Errorf("invalid output path for key '%s': %w", k, err)
 				}
 			}
@@ -87,47 +105,65 @@ func validateGeneric(v interface{}, validator validatorFunc) error {
 	return nil
 }
 
-func validateFile(path string) error {
+func resolvePath(path, baseDir string) string {
+	if baseDir != "" && !filepath.IsAbs(path) {
+		return filepath.Join(baseDir, path)
+	}
+	return path
+}
+
+func validateFile(path, baseDir string) error {
 	// Skip URLs
 	if strings.HasPrefix(path, "http://") || strings.HasPrefix(path, "https://") {
 		return nil
 	}
-	info, err := os.Stat(path)
+
+	fullPath := resolvePath(path, baseDir)
+	info, err := os.Stat(fullPath)
 	if os.IsNotExist(err) {
-		return fmt.Errorf("file not found: %s", path)
+		return fmt.Errorf("file not found: %s", fullPath)
 	}
 	if err != nil {
 		return err
 	}
 	if info.IsDir() {
-		return fmt.Errorf("expected file but found directory: %s", path)
+		return fmt.Errorf("expected file but found directory: %s", fullPath)
 	}
 	return nil
 }
 
-func validateDir(path string) error {
-	info, err := os.Stat(path)
+func validateDir(path, baseDir string) error {
+	fullPath := resolvePath(path, baseDir)
+	info, err := os.Stat(fullPath)
 	if os.IsNotExist(err) {
-		return fmt.Errorf("directory not found: %s", path)
+		return fmt.Errorf("directory not found: %s", fullPath)
 	}
 	if err != nil {
 		return err
 	}
 	if !info.IsDir() {
-		return fmt.Errorf("expected directory but found file: %s", path)
+		return fmt.Errorf("expected directory but found file: %s", fullPath)
 	}
 	return nil
 }
 
-func validateParentDir(path string) error {
-	dir := filepath.Dir(path)
+func validateParentDir(path, baseDir string) error {
+	fullPath := resolvePath(path, baseDir)
+	dir := filepath.Dir(fullPath)
 	if dir == "." {
 		return nil
 	}
-	return validateDir(dir)
+	return validateDir(dir, "")
 }
 
-func validatePathList(v interface{}) error {
+func validatePathList(v interface{}, baseDir string) error {
+	makeValidator := func(base string) validatorFunc {
+		return func(path string) error {
+			return validateDir(path, base)
+		}
+	}
+	valFunc := makeValidator(baseDir)
+
 	switch val := v.(type) {
 	case string:
 		// Split by list separator (colon on UNIX, semicolon on Windows)
@@ -136,12 +172,12 @@ func validatePathList(v interface{}) error {
 			if p == "" {
 				continue
 			}
-			if err := validateDir(p); err != nil {
+			if err := valFunc(p); err != nil {
 				return err
 			}
 		}
 	case []interface{}:
-		return validateGeneric(val, validateDir)
+		return validateGeneric(val, valFunc)
 	}
 	return nil
 }
