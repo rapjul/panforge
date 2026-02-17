@@ -52,7 +52,7 @@ func LoadConfig(path string) (string, *Config, error) {
 	// Helper to check for frontmatter
 	// We check if the file starts with ---
 	// If so, we look for the closing delimiter (--- or ...)
-	var yamlData []byte = data
+	var yamlData = data
 
 	hasFrontmatter := false
 	if len(data) >= 3 && string(data[:3]) == "---" {

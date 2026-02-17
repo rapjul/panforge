@@ -238,6 +238,11 @@ func Process(ctx context.Context, inputFile string, postArgs []string, opts opti
 				metaOut = make(map[string]interface{})
 			}
 
+			// Validate metadata (check for existence of referenced files)
+			if err := pandoc.ValidateMetadata(metaOut); err != nil {
+				return err
+			}
+
 			// Generate Output Filename
 			outputFile := opts.Output
 			if outputFile == "" {
