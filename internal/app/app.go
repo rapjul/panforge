@@ -239,6 +239,21 @@ func Process(ctx context.Context, inputFile string, postArgs []string, opts opti
 				metaOut = make(map[string]interface{})
 			}
 
+			// Merge Generic config into metaOut (if not present), BUT blacklist specific metadata keys
+			// that result in invalid Pandoc flags (e.g. "--creator").
+			if cfg.Generic != nil {
+				for k, v := range cfg.Generic {
+					// Check if k is ignored
+					if pandoc.IgnoredMetadataKeys[k] {
+						continue
+					}
+
+					if _, exists := metaOut[k]; !exists {
+						metaOut[k] = v
+					}
+				}
+			}
+
 			// Validate metadata (check for existence of referenced files)
 			// Determine baseDir from inputFile
 			baseDir := filepath.Dir(inputFile)
@@ -252,7 +267,16 @@ func Process(ctx context.Context, inputFile string, postArgs []string, opts opti
 				outputFile = pandoc.GenerateOutputFilename(inputFile, cfg, metaOut, fmtStr)
 			}
 
-			// Resolve output file path
+			// If output file is relative, we strictly resolve it relative to the input file directory
+			// UNLESS --relative-output is set.
+			if !filepath.IsAbs(outputFile) && !opts.RelativeOutput {
+				dir := filepath.Dir(inputFile)
+				if inputFile != "-" && dir != "." {
+					outputFile = filepath.Join(dir, outputFile)
+				}
+			}
+
+			// Resolve output file path (canonicalize)
 			resolvedOutput, err := utils.ResolvePath(outputFile)
 			if err != nil {
 				return fmt.Errorf("failed to resolve output file path: %w", err)
@@ -280,13 +304,16 @@ func Process(ctx context.Context, inputFile string, postArgs []string, opts opti
 				}
 			}
 
+			// Resolve relative paths in metadata
+			resolvedMetaOut := pandoc.ResolveMetadataPaths(metaOut, baseDir)
+
 			// Build Command
 			pandocArgs := []string{inputFile}
 			pandocArgs = append(pandocArgs, "--to", fmtStr)
 			pandocArgs = append(pandocArgs, "--output", outputFile)
 
 			// Add YAML args
-			pandocArgs = append(pandocArgs, pandoc.GetArgs(metaOut)...)
+			pandocArgs = append(pandocArgs, pandoc.GetArgs(resolvedMetaOut)...)
 
 			// Add CLI args that were passed after inputs or generically
 			// (Note: this logic is simplified compared to Ruby's careful flag stripping)
@@ -327,8 +354,22 @@ func Process(ctx context.Context, inputFile string, postArgs []string, opts opti
 
 			// Use executor
 			// Note: Writing to os.Stdout/Stderr concurrently might interleave output
-			if err := executor.Run(ctx, "pandoc", pandocArgs, os.Stdout, os.Stderr); err != nil {
-				return fmt.Errorf("pandoc failed: %w", err)
+
+			// Capture stderr to provide better error messages
+			var stderrBuf strings.Builder
+			stderrWriter := io.MultiWriter(os.Stderr, &stderrBuf)
+
+			if err := executor.Run(ctx, "pandoc", pandocArgs, os.Stdout, stderrWriter); err != nil {
+				// Extract last line of stderr for a cleaner error message if possible
+				errMsg := err.Error()
+				if stderrStr := stderrBuf.String(); stderrStr != "" {
+					lines := strings.Split(strings.TrimSpace(stderrStr), "\n")
+					if len(lines) > 0 {
+						errMsg = lines[len(lines)-1]
+					}
+				}
+				fmt.Fprintln(os.Stderr) // Separator
+				return fmt.Errorf("an error occurred running the pandoc command: %s", errMsg)
 			}
 			return nil
 		})

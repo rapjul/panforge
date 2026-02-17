@@ -7,6 +7,69 @@ import (
 	"strings"
 )
 
+// pathType defines the type of validation required for a path key.
+type pathType int
+
+const (
+	ptFile pathType = iota
+	ptDir
+	ptParentDir
+)
+
+// KnownPathKeys maps metadata keys to their expected path type.
+var KnownPathKeys = map[string]pathType{
+	// Files
+	"epub-cover-image":       ptFile,
+	"css":                    ptFile,
+	"c":                      ptFile,
+	"epub-fonts":             ptFile,
+	"bibliography":           ptFile,
+	"template":               ptFile,
+	"reference-doc":          ptFile,
+	"include-in-header":      ptFile,
+	"include-before-body":    ptFile,
+	"include-after-body":     ptFile,
+	"csl":                    ptFile,
+	"citation-abbreviations": ptFile,
+
+	// Directories
+	"data-dir": ptDir,
+
+	// Output parent directories
+	"output": ptParentDir,
+
+	"log":      ptParentDir,
+	"log-file": ptParentDir,
+}
+
+// IgnoredMetadataKeys is a set of keys that should NOT be passed as flags to Pandoc.
+// These are typically standard metadata keys that do not have corresponding CLI flags.
+// Note: 'title' and 'author' are handled by the Config struct and usually don't end up in Generic,
+// but we include them for safety.
+var IgnoredMetadataKeys = map[string]bool{
+	"title":       true,
+	"author":      true,
+	"date":        true,
+	"subtitle":    true,
+	"abstract":    true,
+	"keywords":    true,
+	"description": true,
+	"creator":     true,
+	"lang":        true,
+	"subject":     true,
+	"identifier":  true,
+	"publisher":   true,
+	"contributor": true,
+	"coverage":    true,
+	"rights":      true,
+	"source":      true,
+	"relation":    true,
+	"type":        true,
+	"format":      true,
+	"license":     true,
+	// Add other common metadata keys here
+}
+
 // ValidateMetadata checks that file paths in the metadata exist.
 // It skips URLs and handles both single strings and lists of strings.
 // baseDir is used to resolve relative paths. Absolute paths ignore baseDir.
@@ -18,50 +81,20 @@ import (
 // Returns:
 //   - error: an error if validation fails, nil otherwise
 func ValidateMetadata(meta map[string]interface{}, baseDir string) error {
-	// Helper to create a validator with baseDir
-	makeFileValidator := func(base string) validatorFunc {
-		return func(path string) error {
-			return validateFile(path, base)
-		}
-	}
-	makeDirValidator := func(base string) validatorFunc {
-		return func(path string) error {
-			return validateDir(path, base)
-		}
-	}
-	makeParentDirValidator := func(base string) validatorFunc {
-		return func(path string) error {
-			return validateParentDir(path, base)
-		}
-	}
-
-	validators := map[string]validatorFunc{
-		// Files
-		"epub-cover-image":       makeFileValidator(baseDir),
-		"css":                    makeFileValidator(baseDir),
-		"c":                      makeFileValidator(baseDir),
-		"epub-fonts":             makeFileValidator(baseDir),
-		"bibliography":           makeFileValidator(baseDir),
-		"template":               makeFileValidator(baseDir),
-		"reference-doc":          makeFileValidator(baseDir),
-		"include-in-header":      makeFileValidator(baseDir),
-		"include-before-body":    makeFileValidator(baseDir),
-		"include-after-body":     makeFileValidator(baseDir),
-		"csl":                    makeFileValidator(baseDir),
-		"citation-abbreviations": makeFileValidator(baseDir),
-
-		// Directories
-		"data-dir": makeDirValidator(baseDir),
-
-		// Output parent directories
-		"output":   makeParentDirValidator(baseDir),
-		"o":        makeParentDirValidator(baseDir),
-		"log":      makeParentDirValidator(baseDir),
-		"log-file": makeParentDirValidator(baseDir),
-	}
-
 	for k, v := range meta {
-		if validator, ok := validators[k]; ok {
+		if pt, ok := KnownPathKeys[k]; ok {
+			var validator validatorFunc
+			switch pt {
+			case ptFile:
+				validator = func(p string) error { return validateFile(p, baseDir) }
+			case ptDir:
+				validator = func(p string) error { return validateDir(p, baseDir) }
+			case ptParentDir:
+				validator = func(p string) error { return validateParentDir(p, baseDir) }
+			default:
+				return fmt.Errorf("unknown path type for key '%s'", k)
+			}
+
 			if err := validateGeneric(v, validator); err != nil {
 				return fmt.Errorf("invalid path for key '%s': %w", k, err)
 			}
@@ -203,12 +236,7 @@ func validateParentDir(path, baseDir string) error {
 // Returns:
 //   - error: an error if any path in the list is invalid
 func validatePathList(v interface{}, baseDir string) error {
-	makeValidator := func(base string) validatorFunc {
-		return func(path string) error {
-			return validateDir(path, base)
-		}
-	}
-	valFunc := makeValidator(baseDir)
+	valFunc := func(p string) error { return validateDir(p, baseDir) }
 
 	switch val := v.(type) {
 	case string:
@@ -228,4 +256,76 @@ func validatePathList(v interface{}, baseDir string) error {
 		return fmt.Errorf("expected string (path list) or list of strings, got %T", v)
 	}
 	return nil
+}
+
+// ResolveMetadataPaths resolves relative paths in metadata to absolute paths based on baseDir.
+// It returns a copy of the metadata with resolved paths.
+//
+// Parameters:
+//   - meta: the metadata map to resolve
+//   - baseDir: the base directory for resolving relative paths
+//
+// Returns:
+//   - map[string]interface{}: a new metadata map with resolved paths
+func ResolveMetadataPaths(meta map[string]interface{}, baseDir string) map[string]interface{} {
+	resolved := make(map[string]interface{})
+	for k, v := range meta {
+		resolved[k] = v
+	}
+
+	for k, v := range meta {
+		if _, ok := KnownPathKeys[k]; ok {
+			resolved[k] = resolveGenericValue(v, baseDir)
+		} else if k == "resource-path" {
+			resolved[k] = resolveResourcePathValue(v, baseDir)
+		}
+	}
+
+	return resolved
+}
+
+// resolveSinglePath is a helper to resolve a single path string.
+func resolveSinglePath(path, baseDir string) string {
+	// Skip URLs
+	if strings.HasPrefix(path, "http://") || strings.HasPrefix(path, "https://") {
+		return path
+	}
+	if filepath.IsAbs(path) {
+		return path
+	}
+	return filepath.Join(baseDir, path)
+}
+
+// resolveGenericValue resolves paths in a string or list of strings.
+func resolveGenericValue(v interface{}, baseDir string) interface{} {
+	if s, ok := v.(string); ok {
+		return resolveSinglePath(s, baseDir)
+	}
+	if list, ok := v.([]interface{}); ok {
+		var resolvedList []interface{}
+		for _, item := range list {
+			if s, ok := item.(string); ok {
+				resolvedList = append(resolvedList, resolveSinglePath(s, baseDir))
+			} else {
+				resolvedList = append(resolvedList, item)
+			}
+		}
+		return resolvedList
+	}
+	return v
+}
+
+// resolveResourcePathValue handles the special case of resource-path which can be
+// a colon-separated string or a list.
+func resolveResourcePathValue(v interface{}, baseDir string) interface{} {
+	if s, ok := v.(string); ok {
+		parts := filepath.SplitList(s)
+		var resolvedParts []string
+		for _, p := range parts {
+			resolvedParts = append(resolvedParts, resolveSinglePath(p, baseDir))
+		}
+		return strings.Join(resolvedParts, string(os.PathListSeparator))
+	}
+	// If it's a list, it acts like a generic list of paths
+	return resolveGenericValue(v, baseDir)
 }

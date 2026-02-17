@@ -88,6 +88,9 @@ To generate shell completion scripts, run:
 	rootCmd.Flags().BoolVarP(&opts.Quiet, "quiet", "q", false, "Suppress program messages (default: false)")
 	rootCmd.Flags().StringVarP(&opts.Log, "log", "l", "", "Append program calls to FILE (default: none)")
 	rootCmd.Flags().IntVarP(&opts.Concurrency, "concurrency", "c", 0, "Limit number of concurrent pandoc processes (default: number of CPUs)")
+	rootCmd.Flags().BoolVarP(&opts.RelativeOutput, "relative-output", "r", false, "Resolve relative output paths against CWD instead of input file directory (alias: --relative-to-cwd)")
+	rootCmd.Flags().BoolVar(&opts.RelativeOutput, "relative-to-cwd", false, "Alias for --relative-output")
+	_ = rootCmd.Flags().MarkHidden("relative-to-cwd")
 
 	rootCmd.Flags().BoolVarP(&opts.Watch, "watch", "w", false, "Watch input file for changes and re-run (implies --force for overwriting existing output file(s))")
 
