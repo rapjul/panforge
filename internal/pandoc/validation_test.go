@@ -12,10 +12,10 @@ func TestValidateYamlMetadata(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	validFile := filepath.Join(tmpDir, "style.css")
-	if err := os.WriteFile(validFile, []byte("body {}"), 0644); err != nil {
+	if err := os.WriteFile(validFile, []byte("body {}"), 0600); err != nil {
 		t.Fatal(err)
 	}
 

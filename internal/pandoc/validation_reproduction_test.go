@@ -16,15 +16,15 @@ func TestValidateMetadata_RelativePathRepro(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	projectDir := filepath.Join(tmpDir, "project")
-	if err := os.Mkdir(projectDir, 0755); err != nil {
+	if err := os.Mkdir(projectDir, 0750); err != nil {
 		t.Fatal(err)
 	}
 
 	coverFile := filepath.Join(projectDir, "cover.jpg")
-	if err := os.WriteFile(coverFile, []byte("fake image"), 0644); err != nil {
+	if err := os.WriteFile(coverFile, []byte("fake image"), 0600); err != nil {
 		t.Fatal(err)
 	}
 
