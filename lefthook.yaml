@@ -4,7 +4,7 @@ pre-commit:
   parallel: true
   commands:
     golangci-lint:
-      run: golangci-lint run --fast
+      run: golangci-lint run
     go-fmt:
       run: go fmt ./...
     check-yaml:
