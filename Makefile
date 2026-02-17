@@ -8,6 +8,16 @@
 # Default target
 .DEFAULT_GOAL := help
 
+# Handle "make tag v0.1.0"
+ifeq (tag,$(firstword $(MAKECMDGOALS)))
+  # use the rest as arguments for "tag"
+  TAG_ARGS := $(wordlist 2,$(words $(MAKECMDGOALS)),$(MAKECMDGOALS))
+  # ...and turn them into do-nothing targets
+  $(eval $(TAG_ARGS):;@:)
+  # Assign the first argument to v if v is not already set
+  v ?= $(firstword $(TAG_ARGS))
+endif
+
 build: ## Build the application for the current system only (incremental builds)
 	go build -o panforge ./cmd/panforge
 
@@ -44,17 +54,26 @@ clean: ## Clean up build artifacts and remove the binary
 uninstall: ## Uninstall the application
 	go clean -i ./cmd/panforge
 
-tag: ## Create a new git tag and push it. Usage: make tag v=v1.0.0
+tag: ## Create a new git tag and push it. Usage: make tag v=v1.0.0 or make tag v1.0.0
 	@if [ -z "$(v)" ]; then \
 		echo "Error: version argument 'v' is required."; \
-		echo "Usage: make tag v=v1.0.0"; \
+		echo "Usage: make tag v=v1.0.0 or make tag v1.0.0"; \
 		echo ""; \
 		echo "Current version: $$(git describe --tags --abbrev=0 2>/dev/null || echo 'none')"; \
 		exit 1; \
 	fi
 	@command -v git >/dev/null 2>&1 || { echo >&2 "git is not installed. Please install it first."; exit 1; }
-	git tag -a $(v) -m "Release $(v)"
-	git push origin $(v)
+	@tag_name="$(v)"; \
+	case "$$tag_name" in \
+		v*) ;; \
+		*) \
+			tag_name="v$$tag_name"; \
+			echo "Warning: Version '$(v)' did not start with 'v'. Using '$$tag_name' instead."; \
+			echo "Reason: Go modules require semantic version tags to start with 'v'."; \
+			;; \
+	esac; \
+	git tag -a $$tag_name -m "Release $$tag_name"; \
+	git push origin $$tag_name
 
 help: ## Show this help message
 	@echo 'Usage: make [target] ...'
