@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -60,19 +61,30 @@ func LoadConfig(path string) (string, *Config, error) {
 }
 
 // DataDirName returns the data directory for panforge.
-// It checks APPDATA environment variable first, then defaults to ~/.panforge.
+// It follows the XDG Base Directory specification:
+// 1. $XDG_CONFIG_HOME/panforge
+// 2. Windows: %APPDATA%/panforge
+// 3. macOS/Linux: ~/.config/panforge
 //
 // Returns:
 //   - string: the path to the data directory
 func DataDirName() string {
-	if appData := os.Getenv("APPDATA"); appData != "" {
-		return filepath.Join(appData, "panforge")
+	if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
+		return filepath.Join(xdg, "panforge")
 	}
+
+	if runtime.GOOS == "windows" {
+		if appData := os.Getenv("APPDATA"); appData != "" {
+			return filepath.Join(appData, "panforge")
+		}
+	}
+
 	home, err := os.UserHomeDir()
 	if err != nil {
 		log.Printf("Warning: failed to get user home directory: %v", err)
+		return ""
 	}
-	return filepath.Join(home, ".panforge")
+	return filepath.Join(home, ".config", "panforge")
 }
 
 // LoadDefaultConfig tries to load a default YAML configuration by name or path.

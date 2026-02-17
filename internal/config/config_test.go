@@ -2,6 +2,8 @@ package config
 
 import (
 	"os"
+	"path/filepath"
+	"runtime"
 	"testing"
 )
 
@@ -58,6 +60,36 @@ output:
 		if m["standalone"] != true {
 			t.Errorf("html.standalone = %v, want true", m["standalone"])
 		}
+	}
+}
+
+func TestDataDirName(t *testing.T) {
+	// 1. Test XDG_CONFIG_HOME
+	xdgDir := "/tmp/xdg_test_config"
+	t.Setenv("XDG_CONFIG_HOME", xdgDir)
+
+	expected := filepath.Join(xdgDir, "panforge")
+	if got := DataDirName(); got != expected {
+		t.Errorf("DataDirName() with XDG_CONFIG_HOME = %v, want %v", got, expected)
+	}
+
+	// 2. Test Default Fallback (unset XDG_CONFIG_HOME)
+	t.Setenv("XDG_CONFIG_HOME", "")
+
+	// For Windows, we'd need to unset APPDATA too, but let's see current behavior.
+	// We can't easily mock runtime.GOOS, so we test behavior on current platform.
+	got := DataDirName()
+
+	if runtime.GOOS == "windows" {
+		appData := os.Getenv("APPDATA")
+		expected = filepath.Join(appData, "panforge")
+	} else {
+		home, _ := os.UserHomeDir()
+		expected = filepath.Join(home, ".config", "panforge")
+	}
+
+	if got != expected {
+		t.Errorf("DataDirName() default = %v, want %v", got, expected)
 	}
 }
 

@@ -110,6 +110,18 @@ To load completions for every session, correct the above commands to write to yo
 
 ## Configuration
 
+### Configuration Paths
+
+`panforge` looks for configuration files in the following order:
+
+1.  **XDG Specification**: `$XDG_CONFIG_HOME/panforge/` (e.g., `~/.config/panforge/` on Linux/macOS)
+2.  **Windows**: `%APPDATA%/panforge/`
+3.  **Default**: `~/.config/panforge/` (if `XDG_CONFIG_HOME` is unset)
+
+You can place your `default.yaml` or other config files in this directory.
+
+### Metadata Configuration
+
 `panforge` looks for strictly structured metadata in the YAML header of your Markdown file.
 
 ### Multiple Outputs
@@ -215,4 +227,3 @@ This project uses [Lefthook](https://github.com/evilmartians/lefthook) for fast,
 ## Contributing
 
 For development instructions, please see [CONTRIBUTING.md](CONTRIBUTING.md).
-
