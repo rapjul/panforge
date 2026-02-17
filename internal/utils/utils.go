@@ -14,7 +14,7 @@ var slugRegex = regexp.MustCompile("[^a-z0-9]+")
 // ResolvePath returns the absolute path for a given filename.
 //
 // Parameters:
-//   - `path`: the input file path (relative or absolute)
+//   - path: the input file path (relative or absolute)
 //
 // Returns:
 //   - string: the absolute path
@@ -33,7 +33,7 @@ func ResolvePath(path string) (string, error) {
 // Slugify converts a title to a safe filename (simple ASCII fallback).
 //
 // Parameters:
-//   - `title`: the string to slugify
+//   - title: the string to slugify
 //
 // Returns:
 //   - string: the slugified string
@@ -58,7 +58,7 @@ func Slugify(title string) string {
 // It preserves case and spaces but handles OS-specific constraints.
 //
 // Parameters:
-//   - `name`: the filename to sanitize
+//   - name: the filename to sanitize
 //
 // Returns:
 //   - string: the sanitized filename
@@ -69,8 +69,11 @@ func SanitizeFilename(name string) string {
 // sanitize performs OS-specific sanitization.
 //
 // Parameters:
-//   - `name`: the filename to sanitize
-//   - `osName`: the operating system name (e.g., "windows", "darwin")
+//   - name: the filename to sanitize
+//   - osName: the operating system name (e.g., "windows", "darwin")
+//
+// Returns:
+//   - string: the sanitized filename
 func sanitize(name, osName string) string {
 	if name == "" {
 		return ""
@@ -110,6 +113,9 @@ func sanitize(name, osName string) string {
 }
 
 // FormatDate returns the current date in YYYY-MM-DD format.
+//
+// Returns:
+//   - string: the current date
 func FormatDate() string {
 	return time.Now().Format("2006-01-02")
 }

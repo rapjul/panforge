@@ -20,6 +20,7 @@ var (
 	commit  = "none"
 )
 
+// main is the entry point for the panforge application.
 func main() {
 	var opts options.Options
 

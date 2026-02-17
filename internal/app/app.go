@@ -42,11 +42,11 @@ type RealExecutor struct {
 // Run executes a system command using os/exec.
 //
 // Parameters:
-//   - `ctx`: context for cancellation
-//   - `name`: command name
-//   - `args`: command arguments
-//   - `stdout`: writer for standard output
-//   - `stderr`: writer for standard error
+//   - ctx: context for cancellation
+//   - name: command name
+//   - args: command arguments
+//   - stdout: writer for standard output
+//   - stderr: writer for standard error
 func (e *RealExecutor) Run(ctx context.Context, name string, args []string, stdout, stderr io.Writer) error {
 	if e.DryRun {
 		return nil
@@ -63,11 +63,11 @@ func (e *RealExecutor) Run(ctx context.Context, name string, args []string, stdo
 // Run is the main execution logic for the panforge application.
 //
 // Parameters:
-//   - `ctx`: context for cancellation
-//   - `cmd`: the cobra command being executed
-//   - `args`: command line arguments
-//   - `opts`: parsed command line flags
-//   - `executor`: interface for running system commands
+//   - ctx: context for cancellation
+//   - cmd: the cobra command being executed
+//   - args: command line arguments
+//   - opts: parsed command line flags
+//   - executor: interface for running system commands
 func Run(ctx context.Context, cmd *cobra.Command, args []string, opts options.Options, executor CommandExecutor) error {
 	// 1. Parse Input File
 	inputFile, postArgs := parseArgs(args)
@@ -122,11 +122,11 @@ func Run(ctx context.Context, cmd *cobra.Command, args []string, opts options.Op
 // Process handles a single run of the conversion logic.
 //
 // Parameters:
-//   - `ctx`: context for cancellation
-//   - `inputFile`: path to the markdown file to convert
-//   - `postArgs`: additional arguments to pass to pandoc
-//   - `opts`: configuration options
-//   - `executor`: used to run the pandoc command
+//   - ctx: context for cancellation
+//   - inputFile: path to the markdown file to convert
+//   - postArgs: additional arguments to pass to pandoc
+//   - opts: configuration options
+//   - executor: used to run the pandoc command
 //
 //nolint:gocyclo // Code is complex but manageable; refactoring deferred
 func Process(ctx context.Context, inputFile string, postArgs []string, opts options.Options, executor CommandExecutor) error {
@@ -340,7 +340,7 @@ func Process(ctx context.Context, inputFile string, postArgs []string, opts opti
 // parseArgs determines the input file from the command line arguments.
 //
 // Parameters:
-//   - `args`: command line arguments
+//   - args: command line arguments
 //
 // Returns:
 //   - string: input filename
@@ -362,8 +362,8 @@ func parseArgs(args []string) (string, []string) {
 // DetermineTargets figures out which output formats to build.
 //
 // Parameters:
-//   - `opts`: CLI targets
-//   - `cfg`: YAML configuration from the file
+//   - opts: CLI targets
+//   - cfg: YAML configuration from the file
 //
 // It prioritizes CLI targets > 'outputs' list in YAML > 'output' map in YAML > Default "html".
 func DetermineTargets(opts options.Options, cfg *config.Config) []string {
@@ -402,8 +402,11 @@ func DetermineTargets(opts options.Options, cfg *config.Config) []string {
 // isOverwriteAllowed checks if overwrite is explicitly allowed in configuration.
 //
 // Parameters:
-//   - `cfg`: the global config
-//   - `metaOut`: the format-specific config
+//   - cfg: the global config
+//   - metaOut: the format-specific config
+//
+// Returns:
+//   - bool: true if overwrite is allowed, false otherwise
 func isOverwriteAllowed(cfg *config.Config, metaOut map[string]interface{}) bool {
 	// Check specific target config
 	if v, ok := metaOut["overwrite"]; ok {
@@ -423,9 +426,12 @@ func isOverwriteAllowed(cfg *config.Config, metaOut map[string]interface{}) bool
 // askForConfirmation prompts the user for yes/no confirmation.
 //
 // Parameters:
-//   - `filename`: the file being overwritten
-//   - `r`: the input reader (usually stdin)
-//   - `w`: the output writer (usually stderr)
+//   - filename: the file being overwritten
+//   - r: the input reader (usually stdin)
+//   - w: the output writer (usually stderr)
+//
+// Returns:
+//   - bool: true if the user confirmed, false otherwise
 func askForConfirmation(filename string, r io.Reader, w io.Writer) bool {
 	_, _ = fmt.Fprintf(w, "File '%s' already exists. Overwrite? [y/N]: ", filename)
 
@@ -442,10 +448,12 @@ func askForConfirmation(filename string, r io.Reader, w io.Writer) bool {
 // GetRequiredTools determines which tools are needed for the given input file.
 //
 // Parameters:
-//   - `inputFile`: path to the input markdown file
-//   - `opts`: runtime options
+//   - inputFile: path to the input markdown file
+//   - opts: runtime options
 //
-// It returns a list of tool names that should be checked (e.g. "pandoc", "pdflatex").
+// Returns:
+//   - []string: list of tool names that should be checked (e.g. "pandoc", "pdflatex")
+//   - error: an error if the input file cannot be read
 //
 //nolint:gocyclo // Code is complex but manageable; refactoring deferred
 func GetRequiredTools(inputFile string, opts options.Options) ([]string, error) {
@@ -567,6 +575,14 @@ func GetRequiredTools(inputFile string, opts options.Options) ([]string, error) 
 	return required, nil
 }
 
+// contains checks if a string slice contains a specific item.
+//
+// Parameters:
+//   - slice: the slice to check
+//   - item: the item to look for
+//
+// Returns:
+//   - bool: true if the item is found, false otherwise
 func contains(slice []string, item string) bool {
 	for _, s := range slice {
 		if s == item {

@@ -18,8 +18,11 @@ type CheckResult struct {
 // CheckTool checks if a tool is available in PATH and optionally returns its version.
 //
 // Parameters:
-//   - `name`: the command name of the tool
-//   - `versionFlag`: the flag to use to check the version (if empty, tries common flags)
+//   - name: the command name of the tool
+//   - versionFlag: the flag to use to check the version (if empty, tries common flags)
+//
+// Returns:
+//   - CheckResult: struct containing status, path, version, and potential error
 func CheckTool(name string, versionFlag string) CheckResult {
 	path, err := exec.LookPath(name)
 	if err != nil {
@@ -68,28 +71,44 @@ func CheckTool(name string, versionFlag string) CheckResult {
 }
 
 // CheckPandoc verifies pandoc availability and returns check result.
+//
+// Returns:
+//   - CheckResult: status of pandoc tool
 func CheckPandoc() CheckResult {
 	return CheckTool("pandoc", "")
 }
 
 // CheckPDFEngine verifies a PDF engine availability.
 //
+// CheckPDFEngine verifies a PDF engine availability.
+//
 // Parameters:
-//   - `engine`: the name of the PDF engine (e.g., "pdflatex")
+//   - engine: the name of the PDF engine (e.g., "pdflatex")
+//
+// Returns:
+//   - CheckResult: status of the engine
 func CheckPDFEngine(engine string) CheckResult {
 	// Most latex engines support --version
 	return CheckTool(engine, "")
 }
 
 // CheckTypst verifies typst availability.
+//
+// Returns:
+//   - CheckResult: status of typst tool
 func CheckTypst() CheckResult {
 	return CheckTool("typst", "")
 }
 
 // CheckOptionalTool check for optional dependencies.
 //
+// CheckOptionalTool check for optional dependencies.
+//
 // Parameters:
-//   - `name`: the command name of the tool
+//   - name: the command name of the tool
+//
+// Returns:
+//   - CheckResult: status of the tool
 func CheckOptionalTool(name string) CheckResult {
 	return CheckTool(name, "")
 }

@@ -28,7 +28,10 @@ var KnownFormats = []string{"html", "pdf", "epub", "docx"}
 // RunInit executes the init command logic.
 //
 // Parameters:
-//   - `opts`: the initialization options containing flags and settings
+//   - opts: the initialization options containing flags and settings
+//
+// Returns:
+//   - error: an error if the initialization fails
 func RunInit(opts InitOptions) error {
 	if opts.Markdown {
 		return createScaffold(opts)
@@ -40,7 +43,12 @@ func RunInit(opts InitOptions) error {
 }
 
 // createConfig generates a default configuration file.
-// opts contains the initialization options (e.g. Force).
+//
+// Parameters:
+//   - opts: the initialization options containing flags (e.g. Force)
+//
+// Returns:
+//   - error: an error if the config file cannot be created
 func createConfig(opts InitOptions) error {
 	content, err := templates.GetConfigTemplate()
 	if err != nil {
@@ -51,7 +59,12 @@ func createConfig(opts InitOptions) error {
 }
 
 // createScaffold generates a sample markdown input file.
-// opts contains formatting options.
+//
+// Parameters:
+//   - opts: the initialization options containing formatting preferences
+//
+// Returns:
+//   - error: an error if the scaffold file cannot be created
 func createScaffold(opts InitOptions) error {
 	tmplContent, err := templates.GetScaffoldTemplate()
 	if err != nil {
@@ -78,9 +91,14 @@ func createScaffold(opts InitOptions) error {
 }
 
 // createFile writes content to a file.
-// filename is the name of the file to create.
-// content is the string content to write.
-// force determines if existing files should be overwritten.
+//
+// Parameters:
+//   - filename: the name of the file to create
+//   - content: the string content to write
+//   - force: determines if existing files should be overwritten
+//
+// Returns:
+//   - error: an error if the file cannot be written
 func createFile(filename string, content string, force bool) error {
 	// Check if file exists
 	if _, err := os.Stat(filename); err == nil {

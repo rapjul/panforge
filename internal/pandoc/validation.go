@@ -10,6 +10,13 @@ import (
 // ValidateMetadata checks that file paths in the metadata exist.
 // It skips URLs and handles both single strings and lists of strings.
 // baseDir is used to resolve relative paths. Absolute paths ignore baseDir.
+//
+// Parameters:
+//   - meta: the metadata map to validate
+//   - baseDir: the base directory for resolving relative paths
+//
+// Returns:
+//   - error: an error if validation fails, nil otherwise
 func ValidateMetadata(meta map[string]interface{}, baseDir string) error {
 	// Helper to create a validator with baseDir
 	makeFileValidator := func(base string) validatorFunc {
@@ -73,6 +80,13 @@ func ValidateMetadata(meta map[string]interface{}, baseDir string) error {
 type validatorFunc func(string) error
 
 // validateGeneric handles both string and list of strings for a given validator
+//
+// Parameters:
+//   - v: the value to validate
+//   - validator: the validator function to use
+//
+// Returns:
+//   - error: an error if the value is not a string or list of strings
 func validateGeneric(v interface{}, validator validatorFunc) error {
 	switch val := v.(type) {
 	case string:
@@ -93,6 +107,18 @@ func validateGeneric(v interface{}, validator validatorFunc) error {
 	return nil
 }
 
+// resolvePath resolves a path relative to the base directory.
+//
+// If the path is absolute, it returns the path as is.
+// If the path is relative, it returns the path joined with the base directory.
+// If the base directory is empty, it returns the path as is.
+//
+// Parameters:
+//   - path: the path to resolve
+//   - baseDir: the base directory for resolving relative paths
+//
+// Returns:
+//   - string: the resolved path
 func resolvePath(path, baseDir string) string {
 	if baseDir != "" && !filepath.IsAbs(path) {
 		return filepath.Join(baseDir, path)
@@ -100,6 +126,14 @@ func resolvePath(path, baseDir string) string {
 	return path
 }
 
+// validateFile checks if a file exists and is a regular file.
+//
+// Parameters:
+//   - path: the path to the file to validate
+//   - baseDir: the base directory for resolving relative paths
+//
+// Returns:
+//   - error: an error if the file does not exist or is not a regular file
 func validateFile(path, baseDir string) error {
 	// Skip URLs
 	if strings.HasPrefix(path, "http://") || strings.HasPrefix(path, "https://") {
@@ -120,6 +154,14 @@ func validateFile(path, baseDir string) error {
 	return nil
 }
 
+// validateDir checks if a directory exists and is a directory.
+//
+// Parameters:
+//   - path: the path to the directory to validate
+//   - baseDir: the base directory for resolving relative paths
+//
+// Returns:
+//   - error: an error if the directory does not exist or is not a directory
 func validateDir(path, baseDir string) error {
 	fullPath := resolvePath(path, baseDir)
 	info, err := os.Stat(fullPath)
@@ -135,6 +177,14 @@ func validateDir(path, baseDir string) error {
 	return nil
 }
 
+// validateParentDir checks if the parent directory of a path exists and is a directory.
+//
+// Parameters:
+//   - path: the path to the directory to validate
+//   - baseDir: the base directory for resolving relative paths
+//
+// Returns:
+//   - error: an error if the parent directory does not exist or is not a directory
 func validateParentDir(path, baseDir string) error {
 	fullPath := resolvePath(path, baseDir)
 	dir := filepath.Dir(fullPath)
@@ -144,6 +194,14 @@ func validateParentDir(path, baseDir string) error {
 	return validateDir(dir, "")
 }
 
+// validatePathList checks if a list of paths are valid.
+//
+// Parameters:
+//   - v: the list of paths to validate
+//   - baseDir: the base directory for resolving relative paths
+//
+// Returns:
+//   - error: an error if any path in the list is invalid
 func validatePathList(v interface{}, baseDir string) error {
 	makeValidator := func(base string) validatorFunc {
 		return func(path string) error {

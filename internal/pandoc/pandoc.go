@@ -18,6 +18,7 @@ import (
 
 var internalFlags map[string]bool
 
+// init initializes the internalFlags map by reflecting on the Options struct.
 func init() {
 	internalFlags = make(map[string]bool)
 	val := options.Options{}
@@ -41,7 +42,7 @@ func init() {
 // NormalizeFormat strips extensions like +extension or -extension from the format string.
 //
 // Parameters:
-//   - `spec`: the format string (e.g., "markdown+yaml_metadata_block")
+//   - spec: the format string (e.g., "markdown+yaml_metadata_block")
 //
 // Returns:
 //   - string: the base format (e.g., "markdown")
@@ -58,7 +59,7 @@ func NormalizeFormat(spec string) string {
 // ExtForFormat returns the file extension for a given pandoc format.
 //
 // Parameters:
-//   - `fmtStr`: the pandoc format string (e.g. "latex")
+//   - fmtStr: the pandoc format string (e.g. "latex")
 //
 // Returns:
 //   - string: the corresponding file extension (e.g. "tex")
@@ -109,10 +110,10 @@ func GetSupportedFormats() ([]string, error) {
 // GenerateOutputFilename logic determines the output filename based on configuration.
 //
 // Parameters:
-//   - `inputFile`: path to the input file
-//   - `cfg`: global configuration
-//   - `metaOut`: format-specific configuration from YAML
-//   - `pandocFmt`: target pandoc format
+//   - inputFile: path to the input file
+//   - cfg: global configuration
+//   - metaOut: format-specific configuration from YAML
+//   - pandocFmt: target pandoc format
 //
 // Returns:
 //   - string: the generated filename
@@ -187,7 +188,7 @@ func GenerateOutputFilename(inputFile string, cfg *config.Config, metaOut map[st
 // GetArgs converts a metadata map to pandoc arguments.
 //
 // Parameters:
-//   - `meta`: the map of configuration options
+//   - meta: the map of configuration options
 //
 // Returns:
 //   - []string: a slice of command line arguments for pandoc

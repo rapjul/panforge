@@ -15,12 +15,12 @@ import (
 // Watch monitors the input file (and optional config file) for changes and re-runs the conversion.
 //
 // Parameters:
-//   - `ctx`: context for cancellation
-//   - `inputFile`: path to the file being watched
-//   - `configFile`: path to the optional config file
-//   - `postArgs`: arguments to pass to the pandoc command
-//   - `opts`: configuration options
-//   - `executor`: used to run the command
+//   - ctx: context for cancellation
+//   - inputFile: path to the file being watched
+//   - configFile: path to the optional config file
+//   - postArgs: arguments to pass to the pandoc command
+//   - opts: configuration options
+//   - executor: used to run the command
 func Watch(ctx context.Context, inputFile string, configFile string, postArgs []string, opts options.Options, executor CommandExecutor) error {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {

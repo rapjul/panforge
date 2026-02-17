@@ -61,6 +61,9 @@ func LoadConfig(path string) (string, *Config, error) {
 
 // DataDirName returns the data directory for panforge.
 // It checks APPDATA environment variable first, then defaults to ~/.panforge.
+//
+// Returns:
+//   - string: the path to the data directory
 func DataDirName() string {
 	if appData := os.Getenv("APPDATA"); appData != "" {
 		return filepath.Join(appData, "panforge")

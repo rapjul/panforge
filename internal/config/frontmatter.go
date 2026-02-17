@@ -8,6 +8,12 @@ import (
 // It looks for a leading "---", followed by a closing "---" or "..." on a new line.
 // If valid frontmatter is found, it returns the YAML byte slice.
 // Otherwise, it returns the original data (treating the whole file as YAML).
+//
+// Parameters:
+//   - data: the file content to parse
+//
+// Returns:
+//   - []byte: the extracted frontmatter or original data
 func ExtractFrontmatter(data []byte) []byte {
 	// Helper to check for frontmatter
 	// We check if the file starts with ---
