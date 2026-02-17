@@ -12,6 +12,7 @@ build: ## Build the application for the current system only (incremental builds)
 	go build -o panforge ./cmd/panforge
 
 build-all: ## Build for all target systems (requires goreleaser)
+	@command -v goreleaser >/dev/null 2>&1 || { echo >&2 "goreleaser is not installed. Please install it with: go install github.com/goreleaser/goreleaser/v2@latest"; exit 1; }
 	goreleaser build --snapshot --clean
 
 install: ## Install the application
@@ -21,15 +22,19 @@ test: ## Run all tests
 	go test -v ./...
 
 lint: ## Run linter
+	@command -v golangci-lint >/dev/null 2>&1 || { echo >&2 "golangci-lint is not installed. Please install it with: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest"; exit 1; }
 	golangci-lint run
 
 pre-commit: ## Install git pre-commit hooks
+	@command -v lefthook >/dev/null 2>&1 || { echo >&2 "lefthook is not installed. Please install it with: go install github.com/evilmartians/lefthook@latest"; exit 1; }
 	lefthook install
 
 release: ## Create a release and push it to GitHub (requires goreleaser)
+	@command -v goreleaser >/dev/null 2>&1 || { echo >&2 "goreleaser is not installed. Please install it with: go install github.com/goreleaser/goreleaser/v2@latest"; exit 1; }
 	goreleaser release --clean
 
 release-simulate: ## Create a simulated release (for local testing) and build for all target systems (requires goreleaser)
+	@command -v goreleaser >/dev/null 2>&1 || { echo >&2 "goreleaser is not installed. Please install it with: go install github.com/goreleaser/goreleaser/v2@latest"; exit 1; }
 	goreleaser release --snapshot --clean
 
 clean: ## Clean up build artifacts and remove the binary
@@ -47,6 +52,7 @@ tag: ## Create a new git tag and push it. Usage: make tag v=v1.0.0
 		echo "Current version: $$(git describe --tags --abbrev=0 2>/dev/null || echo 'none')"; \
 		exit 1; \
 	fi
+	@command -v git >/dev/null 2>&1 || { echo >&2 "git is not installed. Please install it first."; exit 1; }
 	git tag -a $(v) -m "Release $(v)"
 	git push origin $(v)
 
