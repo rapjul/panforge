@@ -20,8 +20,8 @@ builds:
       - riscv64
       - arm
     goarm:
-      - 6
-      - 7
+      - "6"
+      - "7"
     main: ./cmd/panforge
     ldflags:
       - -s -w
