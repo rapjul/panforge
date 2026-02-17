@@ -20,6 +20,12 @@ install: ## Install the application
 test: ## Run all tests
 	go test -v ./...
 
+lint: ## Run linter
+	golangci-lint run
+
+pre-commit: ## Install git pre-commit hooks
+	lefthook install
+
 release: ## Create a release and push it to GitHub (requires goreleaser)
 	goreleaser release --clean
 
