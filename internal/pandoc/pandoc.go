@@ -6,11 +6,10 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"sort"
 	"strings"
 	"time"
-
-	"reflect"
 
 	"github.com/rapjul/panforge/internal/config"
 	"github.com/rapjul/panforge/internal/options"

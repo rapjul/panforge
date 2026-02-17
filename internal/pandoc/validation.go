@@ -11,24 +11,6 @@ import (
 // It skips URLs and handles both single strings and lists of strings.
 // baseDir is used to resolve relative paths. Absolute paths ignore baseDir.
 func ValidateMetadata(meta map[string]interface{}, baseDir string) error {
-	// Map keys to their validation logic
-	// ValidatorFile: inputs that must be files (or URLs if supported)
-	files := []string{
-		"epub-cover-image", "css", "c", "epub-fonts", "bibliography",
-		"template", "reference-doc", "include-in-header",
-		"include-before-body", "include-after-body",
-		"csl", "citation-abbreviations",
-	}
-
-	// ValidatorDir: inputs that must be directories
-	dirs := []string{"data-dir"}
-
-	// ValidatorPathList: inputs that can be list of paths or colon-separated string
-	pathLists := []string{"resource-path"}
-
-	// ValidatorParentDir: output files where parent must exist
-	parentDirs := []string{"output", "o", "log", "log-file"}
-
 	// Helper to create a validator with baseDir
 	makeFileValidator := func(base string) validatorFunc {
 		return func(path string) error {
@@ -46,40 +28,42 @@ func ValidateMetadata(meta map[string]interface{}, baseDir string) error {
 		}
 	}
 
+	validators := map[string]validatorFunc{
+		// Files
+		"epub-cover-image":       makeFileValidator(baseDir),
+		"css":                    makeFileValidator(baseDir),
+		"c":                      makeFileValidator(baseDir),
+		"epub-fonts":             makeFileValidator(baseDir),
+		"bibliography":           makeFileValidator(baseDir),
+		"template":               makeFileValidator(baseDir),
+		"reference-doc":          makeFileValidator(baseDir),
+		"include-in-header":      makeFileValidator(baseDir),
+		"include-before-body":    makeFileValidator(baseDir),
+		"include-after-body":     makeFileValidator(baseDir),
+		"csl":                    makeFileValidator(baseDir),
+		"citation-abbreviations": makeFileValidator(baseDir),
+
+		// Directories
+		"data-dir": makeDirValidator(baseDir),
+
+		// Output parent directories
+		"output":   makeParentDirValidator(baseDir),
+		"o":        makeParentDirValidator(baseDir),
+		"log":      makeParentDirValidator(baseDir),
+		"log-file": makeParentDirValidator(baseDir),
+	}
+
 	for k, v := range meta {
-		// Check files
-		for _, key := range files {
-			if k == key {
-				if err := validateGeneric(v, makeFileValidator(baseDir)); err != nil {
-					return fmt.Errorf("invalid path for key '%s': %w", k, err)
-				}
+		if validator, ok := validators[k]; ok {
+			if err := validateGeneric(v, validator); err != nil {
+				return fmt.Errorf("invalid path for key '%s': %w", k, err)
 			}
 		}
 
-		// Check dirs
-		for _, key := range dirs {
-			if k == key {
-				if err := validateGeneric(v, makeDirValidator(baseDir)); err != nil {
-					return fmt.Errorf("invalid directory for key '%s': %w", k, err)
-				}
-			}
-		}
-
-		// Check path lists
-		for _, key := range pathLists {
-			if k == key {
-				if err := validatePathList(v, baseDir); err != nil {
-					return fmt.Errorf("invalid resource path for key '%s': %w", k, err)
-				}
-			}
-		}
-
-		// Check parent dirs
-		for _, key := range parentDirs {
-			if k == key {
-				if err := validateGeneric(v, makeParentDirValidator(baseDir)); err != nil {
-					return fmt.Errorf("invalid output path for key '%s': %w", k, err)
-				}
+		// Check path lists (resource-path) separately as it has unique parsing logic
+		if k == "resource-path" {
+			if err := validatePathList(v, baseDir); err != nil {
+				return fmt.Errorf("invalid resource path for key '%s': %w", k, err)
 			}
 		}
 	}
@@ -95,12 +79,16 @@ func validateGeneric(v interface{}, validator validatorFunc) error {
 		return validator(val)
 	case []interface{}:
 		for _, item := range val {
-			if s, ok := item.(string); ok {
-				if err := validator(s); err != nil {
-					return err
-				}
+			s, ok := item.(string)
+			if !ok {
+				return fmt.Errorf("expected string in list, got %T", item)
+			}
+			if err := validator(s); err != nil {
+				return err
 			}
 		}
+	default:
+		return fmt.Errorf("expected string or list of strings, got %T", v)
 	}
 	return nil
 }
@@ -178,6 +166,8 @@ func validatePathList(v interface{}, baseDir string) error {
 		}
 	case []interface{}:
 		return validateGeneric(val, valFunc)
+	default:
+		return fmt.Errorf("expected string (path list) or list of strings, got %T", v)
 	}
 	return nil
 }

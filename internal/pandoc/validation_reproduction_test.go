@@ -7,6 +7,7 @@ import (
 )
 
 func TestValidateMetadata_RelativePathRepro(t *testing.T) {
+	t.Parallel()
 	// 1. Setup a directory structure
 	// tmp/
 	//   project/
