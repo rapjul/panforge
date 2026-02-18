@@ -12,6 +12,7 @@ import (
 	"github.com/rapjul/panforge/internal/app"
 	"github.com/rapjul/panforge/internal/options"
 	"github.com/rapjul/panforge/internal/pandoc"
+	"github.com/rapjul/panforge/internal/ui"
 	"github.com/rapjul/panforge/internal/utils"
 )
 
@@ -47,21 +48,25 @@ To generate shell completion scripts, run:
 
   # Dry run to see the generated command
   panforge input.md --dry-run`,
-		SilenceUsage: true, // Don't show usage on runtime errors
+		SilenceUsage:  true, // Don't show usage on runtime errors
+		SilenceErrors: true, // Don't print errors automatically, we handle them
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Configure Logging
-			logLevel := slog.LevelInfo
-			if opts.Verbose {
-				logLevel = slog.LevelDebug
-			} else if opts.Quiet {
-				logLevel = slog.LevelError
+			var handler slog.Handler
+			if opts.JSON {
+				handler = slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
+					Level: slog.LevelInfo,
+				})
+			} else {
+				level := slog.LevelInfo
+				if opts.Verbose {
+					level = slog.LevelDebug
+				} else if opts.Quiet {
+					level = slog.LevelError
+				}
+				handler = ui.NewPrettyHandler(level)
 			}
-
-			handler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
-				Level: logLevel,
-			})
-			logger := slog.New(handler)
-			opts.Logger = logger
+			opts.Logger = slog.New(handler)
 
 			executor := &app.RealExecutor{
 				DryRun:  opts.DryRun,
@@ -87,6 +92,7 @@ To generate shell completion scripts, run:
 	rootCmd.Flags().BoolVarP(&opts.Verbose, "verbose", "v", false, "Run Pandoc showing output (default: false)")
 	rootCmd.Flags().BoolVarP(&opts.Quiet, "quiet", "q", false, "Suppress program messages (default: false)")
 	rootCmd.Flags().StringVarP(&opts.Log, "log", "l", "", "Append program calls to FILE (default: none)")
+	rootCmd.Flags().BoolVar(&opts.JSON, "json", false, "Output logs in JSON format")
 	rootCmd.Flags().IntVarP(&opts.Concurrency, "concurrency", "c", 0, "Limit number of concurrent pandoc processes (default: number of CPUs)")
 	rootCmd.Flags().BoolVarP(&opts.RelativeOutput, "relative-output", "r", false, "Resolve relative output paths against CWD instead of input file directory (alias: --relative-to-cwd)")
 	rootCmd.Flags().BoolVar(&opts.RelativeOutput, "relative-to-cwd", false, "Alias for --relative-output")
@@ -215,6 +221,12 @@ If no file is provided, it checks for all known tools.`,
 	rootCmd.AddCommand(checkCmd)
 
 	if err := rootCmd.Execute(); err != nil {
+		if opts.Logger != nil {
+			opts.Logger.Error(err.Error())
+		} else {
+			// Fallback if logger initialization failed (unlikely)
+			fmt.Fprintln(os.Stderr, err)
+		}
 		os.Exit(1)
 	}
 }

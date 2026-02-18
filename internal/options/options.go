@@ -17,5 +17,6 @@ type Options struct {
 	Watch          bool         `flag:"watch" shorthand:"w"`
 	Concurrency    int          `flag:"concurrency" shorthand:"c"`
 	RelativeOutput bool         `flag:"relative-output" shorthand:"r"`
+	JSON           bool         `flag:"json"`
 	Logger         *slog.Logger // Not a flag
 }

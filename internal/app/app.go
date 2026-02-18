@@ -257,6 +257,12 @@ func Process(ctx context.Context, inputFile string, postArgs []string, opts opti
 			// Validate metadata (check for existence of referenced files)
 			// Determine baseDir from inputFile
 			baseDir := filepath.Dir(inputFile)
+
+			// Log effective configuration if verbose
+			if opts.Verbose {
+				opts.Logger.Debug("Effective configuration", "config", metaOut)
+			}
+
 			if err := pandoc.ValidateMetadata(metaOut, baseDir); err != nil {
 				return err
 			}
@@ -340,7 +346,14 @@ func Process(ctx context.Context, inputFile string, postArgs []string, opts opti
 			// Log execution
 			// We use Info level. If --quiet is set, logger should be configured to Error level only.
 			if opts.Logger != nil {
-				opts.Logger.Info("executing command", "command", cmdStr)
+				fullArgs := append([]string{"pandoc"}, quotedArgs...)
+				logArgs := []interface{}{"command", cmdStr, "args", fullArgs}
+				msg := "executing the command"
+				if opts.DryRun {
+					msg = "dry run: displaying the command"
+					logArgs = append(logArgs, "dry_run", true)
+				}
+				opts.Logger.Info(msg, logArgs...)
 			} else if !opts.Quiet {
 				// Fallback if no logger validation
 				fmt.Printf("panforge calling: %s\n", cmdStr)
