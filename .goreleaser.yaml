@@ -80,5 +80,6 @@ changelog:
       - "^docs:"
       - "^test:"
       - "^style:"
+      - '(?i)\[skip changelog\]'
       - "Merge branch"
       - "Merge pull request"

@@ -144,3 +144,4 @@ _antigravity/
 
 # Build Artifacts
 dist/
+vendor/
