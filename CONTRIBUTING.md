@@ -57,6 +57,11 @@ We use `pre-commit` to ensure code quality.
 3.  Push your branch to GitHub.
 4.  Open a Pull Request against the `main` branch.
 
+### Commit messages & changelog
+
+- Small housekeeping commits (for example, `.gitignore` updates) can be excluded from the generated release changelog by appending `[skip changelog]` to the commit message.
+- Example: `chore(git): Update .gitignore to ignore .DS_Store [skip changelog]`
+
 ## Coding Standards
 
 - **Formatting**: We use `gofmt` (handled by `pre-commit`).
