@@ -129,7 +129,7 @@ func (h *PrettyHandler) WithGroup(name string) slog.Handler {
 }
 
 // renderCommand parses a command string (or slice) and styles it with wrapping.
-func renderCommand(cmd interface{}) string {
+func renderCommand(cmd any) string {
 	var parts []string
 	switch v := cmd.(type) {
 	case []string:

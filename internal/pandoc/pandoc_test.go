@@ -64,7 +64,7 @@ func TestGenerateOutputFilename(t *testing.T) {
 	type args struct {
 		inputFile string
 		cfg       *config.Config
-		metaOut   map[string]interface{}
+		metaOut   map[string]any
 		pandocFmt string
 	}
 	tests := []struct {
@@ -74,27 +74,27 @@ func TestGenerateOutputFilename(t *testing.T) {
 	}{
 		{
 			"basic template",
-			args{"input.md", cfg, map[string]interface{}{}, "html"},
+			args{"input.md", cfg, map[string]any{}, "html"},
 			"My Document_Jane Doe.html",
 		},
 		{
 			"override filename",
-			args{"input.md", cfg, map[string]interface{}{"output": "custom.html"}, "html"},
+			args{"input.md", cfg, map[string]any{"output": "custom.html"}, "html"},
 			"custom.html",
 		},
 		{
 			"slugify enabled global",
-			args{"input.md", &config.Config{Title: "Title", FilenameTemplate: "{title}.{ext}", SlugifyFilename: &tru}, map[string]interface{}{}, "html"},
+			args{"input.md", &config.Config{Title: "Title", FilenameTemplate: "{title}.{ext}", SlugifyFilename: &tru}, map[string]any{}, "html"},
 			"title.html",
 		},
 		{
 			"slugify allowed in meta",
-			args{"input.md", cfg, map[string]interface{}{"slugify-filename": true}, "html"},
+			args{"input.md", cfg, map[string]any{"slugify-filename": true}, "html"},
 			"my-document-jane-doe.html",
 		},
 		{
 			"explicit slug token",
-			args{"input.md", &config.Config{Title: "My Title", FilenameTemplate: "{title-slug}.{ext}"}, map[string]interface{}{}, "html"},
+			args{"input.md", &config.Config{Title: "My Title", FilenameTemplate: "{title-slug}.{ext}"}, map[string]any{}, "html"},
 			"my-title.html",
 		},
 	}
@@ -114,37 +114,37 @@ func TestGenerateOutputFilename(t *testing.T) {
 func TestGetArgs(t *testing.T) {
 	tests := []struct {
 		name string
-		meta map[string]interface{}
+		meta map[string]any
 		want []string
 	}{
 		{
 			"simple boolean",
-			map[string]interface{}{"standalone": true, "toc": true},
+			map[string]any{"standalone": true, "toc": true},
 			[]string{"--standalone", "--toc"},
 		},
 		{
 			"simple string",
-			map[string]interface{}{"css": "style.css"},
+			map[string]any{"css": "style.css"},
 			[]string{"--css", "style.css"},
 		},
 		{
 			"list",
-			map[string]interface{}{"variable": []interface{}{"key=val", "foo=bar"}},
+			map[string]any{"variable": []any{"key=val", "foo=bar"}},
 			[]string{"--variable", "key=val", "--variable", "foo=bar"},
 		},
 		{
 			"map",
-			map[string]interface{}{"metadata": map[string]interface{}{"foo": "bar"}},
+			map[string]any{"metadata": map[string]any{"foo": "bar"}},
 			[]string{"--metadata", "foo=bar"},
 		},
 		{
 			"ignore internal flags",
-			map[string]interface{}{"force": true, "verbose": true},
+			map[string]any{"force": true, "verbose": true},
 			[]string{},
 		},
 		{
 			"underscores to dashes",
-			map[string]interface{}{"toc_depth": 2},
+			map[string]any{"toc_depth": 2},
 			[]string{"--toc-depth", "2"},
 		},
 	}

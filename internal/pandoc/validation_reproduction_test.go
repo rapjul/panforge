@@ -31,7 +31,7 @@ func TestValidateMetadata_RelativePathRepro(t *testing.T) {
 
 	// 2. We are currently running in the package directory or some other dir.
 	// We want to simulate processing input.md which refers to "cover.jpg"
-	meta := map[string]interface{}{
+	meta := map[string]any{
 		"epub-cover-image": "cover.jpg",
 	}
 

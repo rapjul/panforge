@@ -16,9 +16,9 @@ func TestCLI_GoodInput(t *testing.T) {
 
 	// Files expected to be generated in CWD (which is ./test package dir during testing)
 	expectedFiles := []string{
-		"My Document.epub",
-		"test-output.html",
-		"test.pdf",
+		"test-files/My Document.epub",
+		"test-files/test-output.html",
+		"test-files/test.pdf",
 	}
 
 	// Cleanup before execution

@@ -11,126 +11,126 @@ func TestValidateYamlMetadata(t *testing.T) {
 	// We'll move tmpDir creation inside the test loop for isolation.
 	tests := []struct {
 		name    string
-		setup   func(t *testing.T) (map[string]interface{}, string) // returns meta and baseDir (or cleanup dir)
+		setup   func(t *testing.T) (map[string]any, string) // returns meta and baseDir (or cleanup dir)
 		wantErr bool
 	}{
 		{
 			name: "Valid file",
-			setup: func(t *testing.T) (map[string]interface{}, string) {
+			setup: func(t *testing.T) (map[string]any, string) {
 				d := t.TempDir()
 				f := filepath.Join(d, "style.css")
 				if err := os.WriteFile(f, []byte("body {}"), 0600); err != nil {
 					t.Fatal(err)
 				}
-				return map[string]interface{}{"css": f}, ""
+				return map[string]any{"css": f}, ""
 			},
 			wantErr: false,
 		},
 		{
 			name: "Missing file",
-			setup: func(t *testing.T) (map[string]interface{}, string) {
-				return map[string]interface{}{"css": "missing_style.css"}, ""
+			setup: func(t *testing.T) (map[string]any, string) {
+				return map[string]any{"css": "missing_style.css"}, ""
 			},
 			wantErr: true,
 		},
 		{
 			name: "Valid list of files",
-			setup: func(t *testing.T) (map[string]interface{}, string) {
+			setup: func(t *testing.T) (map[string]any, string) {
 				d := t.TempDir()
 				f := filepath.Join(d, "style.css")
 				if err := os.WriteFile(f, []byte("body {}"), 0600); err != nil {
 					t.Fatal(err)
 				}
-				return map[string]interface{}{"css": []interface{}{f, f}}, ""
+				return map[string]any{"css": []any{f, f}}, ""
 			},
 			wantErr: false,
 		},
 		{
 			name: "List with missing file",
-			setup: func(t *testing.T) (map[string]interface{}, string) {
+			setup: func(t *testing.T) (map[string]any, string) {
 				d := t.TempDir()
 				f := filepath.Join(d, "style.css")
 				if err := os.WriteFile(f, []byte("body {}"), 0600); err != nil {
 					t.Fatal(err)
 				}
-				return map[string]interface{}{"css": []interface{}{f, "missing.css"}}, ""
+				return map[string]any{"css": []any{f, "missing.css"}}, ""
 			},
 			wantErr: true,
 		},
 		{
 			name: "Valid URL",
-			setup: func(t *testing.T) (map[string]interface{}, string) {
-				return map[string]interface{}{"include-in-header": "https://example.com/header.html"}, ""
+			setup: func(t *testing.T) (map[string]any, string) {
+				return map[string]any{"include-in-header": "https://example.com/header.html"}, ""
 			},
 			wantErr: false,
 		},
 		{
 			name: "Output dir exists",
-			setup: func(t *testing.T) (map[string]interface{}, string) {
+			setup: func(t *testing.T) (map[string]any, string) {
 				d := t.TempDir()
-				return map[string]interface{}{"output": filepath.Join(d, "out.html")}, ""
+				return map[string]any{"output": filepath.Join(d, "out.html")}, ""
 			},
 			wantErr: false,
 		},
 		{
 			name: "Output parent dir missing",
-			setup: func(t *testing.T) (map[string]interface{}, string) {
+			setup: func(t *testing.T) (map[string]any, string) {
 				d := t.TempDir()
-				return map[string]interface{}{"output": filepath.Join(d, "subdir", "out.html")}, ""
+				return map[string]any{"output": filepath.Join(d, "subdir", "out.html")}, ""
 			},
 			wantErr: true,
 		},
 		{
 			name: "Mixed valid URL and missing file in list",
-			setup: func(t *testing.T) (map[string]interface{}, string) {
-				return map[string]interface{}{"include-in-header": []interface{}{"https://example.com/header.html", "missing.html"}}, ""
+			setup: func(t *testing.T) (map[string]any, string) {
+				return map[string]any{"include-in-header": []any{"https://example.com/header.html", "missing.html"}}, ""
 			},
 			wantErr: true,
 		},
 		{
 			name: "Valid resource-path string",
-			setup: func(t *testing.T) (map[string]interface{}, string) {
+			setup: func(t *testing.T) (map[string]any, string) {
 				d := t.TempDir()
-				return map[string]interface{}{"resource-path": d}, ""
+				return map[string]any{"resource-path": d}, ""
 			},
 			wantErr: false,
 		},
 		{
 			name: "Valid resource-path list",
-			setup: func(t *testing.T) (map[string]interface{}, string) {
+			setup: func(t *testing.T) (map[string]any, string) {
 				d := t.TempDir()
-				return map[string]interface{}{"resource-path": []interface{}{d}}, ""
+				return map[string]any{"resource-path": []any{d}}, ""
 			},
 			wantErr: false,
 		},
 		{
 			name: "Invalid resource-path string",
-			setup: func(t *testing.T) (map[string]interface{}, string) {
-				return map[string]interface{}{"resource-path": "/non/existent/path"}, ""
+			setup: func(t *testing.T) (map[string]any, string) {
+				return map[string]any{"resource-path": "/non/existent/path"}, ""
 			},
 			wantErr: true,
 		},
 		{
 			name: "Invalid resource-path list",
-			setup: func(t *testing.T) (map[string]interface{}, string) {
+			setup: func(t *testing.T) (map[string]any, string) {
 				d := t.TempDir()
-				return map[string]interface{}{"resource-path": []interface{}{d, "/non/existent/path"}}, ""
+				return map[string]any{"resource-path": []any{d, "/non/existent/path"}}, ""
 			},
 			wantErr: true,
 		},
 		{
 			name: "Valid multiple resource-path string",
-			setup: func(t *testing.T) (map[string]interface{}, string) {
+			setup: func(t *testing.T) (map[string]any, string) {
 				d := t.TempDir()
-				return map[string]interface{}{"resource-path": d + string(filepath.ListSeparator) + d}, ""
+				return map[string]any{"resource-path": d + string(filepath.ListSeparator) + d}, ""
 			},
 			wantErr: false,
 		},
 		// New Test Case for Invalid Type in List
 		{
 			name: "Invalid type in list",
-			setup: func(t *testing.T) (map[string]interface{}, string) {
-				return map[string]interface{}{"css": []interface{}{"style.css", 123}}, ""
+			setup: func(t *testing.T) (map[string]any, string) {
+				return map[string]any{"css": []any{"style.css", 123}}, ""
 			},
 			wantErr: true,
 		},

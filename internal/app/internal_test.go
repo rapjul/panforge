@@ -18,7 +18,7 @@ func TestDetermineTargets(t *testing.T) {
 			name: "CLI targets override everything",
 			opts: options.Options{Targets: []string{"pdf", "docx"}},
 			cfg: &config.Config{
-				Outputs: []interface{}{"html"},
+				Outputs: []any{"html"},
 			},
 			expected: []string{"pdf", "docx"},
 		},
@@ -26,7 +26,7 @@ func TestDetermineTargets(t *testing.T) {
 			name: "Config outputs list used if no CLI targets",
 			opts: options.Options{},
 			cfg: &config.Config{
-				Outputs: []interface{}{"html", "epub"},
+				Outputs: []any{"html", "epub"},
 			},
 			expected: []string{"html", "epub"},
 		},
@@ -34,7 +34,7 @@ func TestDetermineTargets(t *testing.T) {
 			name: "Config output map used if no outputs list",
 			opts: options.Options{},
 			cfg: &config.Config{
-				OutputMap: map[string]interface{}{
+				OutputMap: map[string]any{
 					"pdf":  nil,
 					"docx": nil,
 				},
@@ -70,19 +70,19 @@ func TestIsOverwriteAllowed(t *testing.T) {
 	tests := []struct {
 		name    string
 		cfg     *config.Config
-		metaOut map[string]interface{}
+		metaOut map[string]any
 		want    bool
 	}{
 		{
 			name:    "Default false",
 			cfg:     &config.Config{},
-			metaOut: map[string]interface{}{},
+			metaOut: map[string]any{},
 			want:    false,
 		},
 		{
 			name: "Target specific true",
 			cfg:  &config.Config{},
-			metaOut: map[string]interface{}{
+			metaOut: map[string]any{
 				"overwrite": true,
 			},
 			want: true,
@@ -90,9 +90,9 @@ func TestIsOverwriteAllowed(t *testing.T) {
 		{
 			name: "Target specific false",
 			cfg: &config.Config{
-				Generic: map[string]interface{}{"overwrite": true},
+				Generic: map[string]any{"overwrite": true},
 			},
-			metaOut: map[string]interface{}{
+			metaOut: map[string]any{
 				"overwrite": false,
 			},
 			// Current logic: checks target first. If target differs?
@@ -110,9 +110,9 @@ func TestIsOverwriteAllowed(t *testing.T) {
 		{
 			name: "Global true",
 			cfg: &config.Config{
-				Generic: map[string]interface{}{"overwrite": true},
+				Generic: map[string]any{"overwrite": true},
 			},
-			metaOut: map[string]interface{}{},
+			metaOut: map[string]any{},
 			want:    true,
 		},
 	}

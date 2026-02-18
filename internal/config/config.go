@@ -20,15 +20,15 @@ type Config struct {
 	// Author of the document.
 	Author string `yaml:"author,omitempty"`
 	// Outputs list (e.g., ["html", "pdf"]).
-	Outputs []interface{} `yaml:"outputs,omitempty"`
+	Outputs []any `yaml:"outputs,omitempty"`
 	// OutputMap allows detailed configuration per format.
-	OutputMap map[string]interface{} `yaml:"output,omitempty"`
+	OutputMap map[string]any `yaml:"output,omitempty"`
 	// FilenameTemplate for generating output filenames.
 	FilenameTemplate string `yaml:"filename-template,omitempty"`
 	// SlugifyFilename acts as a tri-state boolean (nil = unset).
 	SlugifyFilename *bool `yaml:"slugify-filename,omitempty"`
 	// Generic captures all other top-level keys as metadata.
-	Generic map[string]interface{} `yaml:",inline"`
+	Generic map[string]any `yaml:",inline"`
 }
 
 // LoadConfig loads the YAML configuration from a file.

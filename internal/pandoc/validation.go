@@ -80,7 +80,7 @@ var IgnoredMetadataKeys = map[string]bool{
 //
 // Returns:
 //   - error: an error if validation fails, nil otherwise
-func ValidateMetadata(meta map[string]interface{}, baseDir string) error {
+func ValidateMetadata(meta map[string]any, baseDir string) error {
 	for k, v := range meta {
 		if pt, ok := KnownPathKeys[k]; ok {
 			var validator validatorFunc
@@ -120,11 +120,11 @@ type validatorFunc func(string) error
 //
 // Returns:
 //   - error: an error if the value is not a string or list of strings
-func validateGeneric(v interface{}, validator validatorFunc) error {
+func validateGeneric(v any, validator validatorFunc) error {
 	switch val := v.(type) {
 	case string:
 		return validator(val)
-	case []interface{}:
+	case []any:
 		for _, item := range val {
 			s, ok := item.(string)
 			if !ok {
@@ -235,7 +235,7 @@ func validateParentDir(path, baseDir string) error {
 //
 // Returns:
 //   - error: an error if any path in the list is invalid
-func validatePathList(v interface{}, baseDir string) error {
+func validatePathList(v any, baseDir string) error {
 	valFunc := func(p string) error { return validateDir(p, baseDir) }
 
 	switch val := v.(type) {
@@ -250,7 +250,7 @@ func validatePathList(v interface{}, baseDir string) error {
 				return err
 			}
 		}
-	case []interface{}:
+	case []any:
 		return validateGeneric(val, valFunc)
 	default:
 		return fmt.Errorf("expected string (path list) or list of strings, got %T", v)
@@ -267,8 +267,8 @@ func validatePathList(v interface{}, baseDir string) error {
 //
 // Returns:
 //   - map[string]interface{}: a new metadata map with resolved paths
-func ResolveMetadataPaths(meta map[string]interface{}, baseDir string) map[string]interface{} {
-	resolved := make(map[string]interface{})
+func ResolveMetadataPaths(meta map[string]any, baseDir string) map[string]any {
+	resolved := make(map[string]any)
 	for k, v := range meta {
 		resolved[k] = v
 	}
@@ -297,12 +297,12 @@ func resolveSinglePath(path, baseDir string) string {
 }
 
 // resolveGenericValue resolves paths in a string or list of strings.
-func resolveGenericValue(v interface{}, baseDir string) interface{} {
+func resolveGenericValue(v any, baseDir string) any {
 	if s, ok := v.(string); ok {
 		return resolveSinglePath(s, baseDir)
 	}
-	if list, ok := v.([]interface{}); ok {
-		var resolvedList []interface{}
+	if list, ok := v.([]any); ok {
+		var resolvedList []any
 		for _, item := range list {
 			if s, ok := item.(string); ok {
 				resolvedList = append(resolvedList, resolveSinglePath(s, baseDir))
@@ -317,7 +317,7 @@ func resolveGenericValue(v interface{}, baseDir string) interface{} {
 
 // resolveResourcePathValue handles the special case of resource-path which can be
 // a colon-separated string or a list.
-func resolveResourcePathValue(v interface{}, baseDir string) interface{} {
+func resolveResourcePathValue(v any, baseDir string) any {
 	if s, ok := v.(string); ok {
 		parts := filepath.SplitList(s)
 		var resolvedParts []string

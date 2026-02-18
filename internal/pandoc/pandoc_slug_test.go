@@ -18,7 +18,7 @@ func TestGenerateOutputFilename(t *testing.T) {
 	cases := []struct {
 		name     string
 		cfg      *config.Config
-		meta     map[string]interface{}
+		meta     map[string]any
 		fmt      string
 		expected string // If empty, we check loose matching
 	}{
@@ -27,7 +27,7 @@ func TestGenerateOutputFilename(t *testing.T) {
 			cfg: &config.Config{
 				Title: "My Title",
 			},
-			meta:     map[string]interface{}{},
+			meta:     map[string]any{},
 			fmt:      "html",
 			expected: "My Title_" + dateStr + ".html",
 		},
@@ -37,7 +37,7 @@ func TestGenerateOutputFilename(t *testing.T) {
 				Title:           "My Title",
 				SlugifyFilename: nil,
 			},
-			meta:     map[string]interface{}{},
+			meta:     map[string]any{},
 			fmt:      "html",
 			expected: "My Title_" + dateStr + ".html",
 		},
@@ -47,7 +47,7 @@ func TestGenerateOutputFilename(t *testing.T) {
 				Title:           "My Title",
 				SlugifyFilename: boolPtr(true),
 			},
-			meta:     map[string]interface{}{},
+			meta:     map[string]any{},
 			fmt:      "html",
 			expected: "my-title-" + dateStr + ".html", // Dashes because slugify replaces underscores too
 		},
@@ -58,7 +58,7 @@ func TestGenerateOutputFilename(t *testing.T) {
 				Author:           "Jane Doe",
 				FilenameTemplate: "{author-slug}-{title}.{ext}",
 			},
-			meta:     map[string]interface{}{},
+			meta:     map[string]any{},
 			fmt:      "pdf",
 			expected: "jane-doe-My Title.pdf",
 		},
@@ -68,7 +68,7 @@ func TestGenerateOutputFilename(t *testing.T) {
 				Title:            "My Title",
 				FilenameTemplate: "{title-slug}.{ext}",
 			},
-			meta:     map[string]interface{}{},
+			meta:     map[string]any{},
 			fmt:      "markdown",
 			expected: "my-title.md",
 		},
@@ -78,7 +78,7 @@ func TestGenerateOutputFilename(t *testing.T) {
 				Title:            "Doc",
 				FilenameTemplate: "file.{ext}",
 			},
-			meta:     map[string]interface{}{},
+			meta:     map[string]any{},
 			fmt:      "epub",
 			expected: "file.epub",
 		},
@@ -88,7 +88,7 @@ func TestGenerateOutputFilename(t *testing.T) {
 				Title:            "Part 1/2",
 				FilenameTemplate: "{title}",
 			},
-			meta:     map[string]interface{}{},
+			meta:     map[string]any{},
 			fmt:      "html",
 			expected: "", // "Part 1_2" (slash replaced)
 		},
@@ -98,7 +98,7 @@ func TestGenerateOutputFilename(t *testing.T) {
 				Title:           "My Title",
 				SlugifyFilename: boolPtr(false),
 			},
-			meta: map[string]interface{}{
+			meta: map[string]any{
 				"slugify-filename": true,
 			},
 			fmt:      "html",
@@ -138,7 +138,7 @@ func TestGenerateOutputFilename_Time(t *testing.T) {
 		Title:            "Time Test",
 		FilenameTemplate: "{time}",
 	}
-	got := pandoc.GenerateOutputFilename("input.md", cfg, map[string]interface{}{}, "html")
+	got := pandoc.GenerateOutputFilename("input.md", cfg, map[string]any{}, "html")
 	// Format is 15-04-05 (HH-MM-SS)
 	// Validate length and format
 	// Should be e.g. 14-30-01.html

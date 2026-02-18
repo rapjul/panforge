@@ -53,7 +53,7 @@ output:
 	if val, ok := cfg.OutputMap["html"]; !ok {
 		t.Error("OutputMap missing html key")
 	} else {
-		m, ok := val.(map[string]interface{})
+		m, ok := val.(map[string]any)
 		if !ok {
 			t.Error("html value is not a map")
 		}

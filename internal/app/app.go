@@ -171,7 +171,7 @@ func Process(ctx context.Context, inputFile string, postArgs []string, opts opti
 			}
 		}
 		if cfg.Generic == nil {
-			cfg.Generic = make(map[string]interface{})
+			cfg.Generic = make(map[string]any)
 		}
 		if defaultCfg.Generic != nil {
 			for k, v := range defaultCfg.Generic {
@@ -218,25 +218,25 @@ func Process(ctx context.Context, inputFile string, postArgs []string, opts opti
 			// Resolve Format
 			fmtStr := pandoc.NormalizeFormat(t)
 			// Check if t maps to an output entry in YAML
-			var metaOut map[string]interface{}
+			var metaOut map[string]any
 
 			// Logic to find specific output config in YAML:
 			// logic similar to ruby resolve_target_format
 			if val, ok := cfg.OutputMap[t]; ok {
-				if m, ok := val.(map[string]interface{}); ok {
+				if m, ok := val.(map[string]any); ok {
 					metaOut = m
 					if to, ok := m["to"].(string); ok && to != "" {
 						fmtStr = to
 					}
 				}
 			} else if val, ok := cfg.Generic[t]; ok {
-				if m, ok := val.(map[string]interface{}); ok {
+				if m, ok := val.(map[string]any); ok {
 					metaOut = m
 				}
 			}
 
 			if metaOut == nil {
-				metaOut = make(map[string]interface{})
+				metaOut = make(map[string]any)
 			}
 
 			// Merge Generic config into metaOut (if not present), BUT blacklist specific metadata keys
@@ -347,7 +347,7 @@ func Process(ctx context.Context, inputFile string, postArgs []string, opts opti
 			// We use Info level. If --quiet is set, logger should be configured to Error level only.
 			if opts.Logger != nil {
 				fullArgs := append([]string{"pandoc"}, quotedArgs...)
-				logArgs := []interface{}{"command", cmdStr, "args", fullArgs}
+				logArgs := []any{"command", cmdStr, "args", fullArgs}
 				msg := "executing the command"
 				if opts.DryRun {
 					msg = "dry run: displaying the command"
@@ -461,7 +461,7 @@ func DetermineTargets(opts options.Options, cfg *config.Config) []string {
 //
 // Returns:
 //   - bool: true if overwrite is allowed, false otherwise
-func isOverwriteAllowed(cfg *config.Config, metaOut map[string]interface{}) bool {
+func isOverwriteAllowed(cfg *config.Config, metaOut map[string]any) bool {
 	// Check specific target config
 	if v, ok := metaOut["overwrite"]; ok {
 		if b, ok := v.(bool); ok && b {
@@ -547,7 +547,7 @@ func GetRequiredTools(inputFile string, opts options.Options) ([]string, error) 
 			}
 		}
 		if cfg.Generic == nil {
-			cfg.Generic = make(map[string]interface{})
+			cfg.Generic = make(map[string]any)
 		}
 		if defaultCfg.Generic != nil {
 			for k, v := range defaultCfg.Generic {
@@ -567,16 +567,16 @@ func GetRequiredTools(inputFile string, opts options.Options) ([]string, error) 
 		fmtStr := pandoc.NormalizeFormat(t)
 
 		// Check for overrides in config to fully resolve format (e.g. target "paper" might be "latex" or "typst")
-		var metaOut map[string]interface{}
+		var metaOut map[string]any
 		if val, ok := cfg.OutputMap[t]; ok {
-			if m, ok := val.(map[string]interface{}); ok {
+			if m, ok := val.(map[string]any); ok {
 				metaOut = m
 				if to, ok := m["to"].(string); ok && to != "" {
 					fmtStr = to
 				}
 			}
 		} else if val, ok := cfg.Generic[t]; ok {
-			if m, ok := val.(map[string]interface{}); ok {
+			if m, ok := val.(map[string]any); ok {
 				metaOut = m
 			}
 		}

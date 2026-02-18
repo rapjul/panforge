@@ -117,7 +117,7 @@ func GetSupportedFormats() ([]string, error) {
 //
 // Returns:
 //   - string: the generated filename
-func GenerateOutputFilename(inputFile string, cfg *config.Config, metaOut map[string]interface{}, pandocFmt string) string {
+func GenerateOutputFilename(inputFile string, cfg *config.Config, metaOut map[string]any, pandocFmt string) string {
 	if val, ok := metaOut["output"]; ok {
 		if s, ok := val.(string); ok && s != "" {
 			return s
@@ -192,13 +192,13 @@ func GenerateOutputFilename(inputFile string, cfg *config.Config, metaOut map[st
 //
 // Returns:
 //   - []string: a slice of command line arguments for pandoc
-func GetArgs(meta map[string]interface{}) []string {
+func GetArgs(meta map[string]any) []string {
 	var args []string
 
 	// Check if `pandoc_args` exists and handle it separately
 	var pandocArgs []string
 	if val, ok := meta["pandoc_args"]; ok {
-		if list, ok := val.([]interface{}); ok {
+		if list, ok := val.([]any); ok {
 			for _, item := range list {
 				pandocArgs = append(pandocArgs, fmt.Sprintf("%v", item))
 			}
@@ -246,11 +246,11 @@ func GetArgs(meta map[string]interface{}) []string {
 			if v {
 				args = append(args, flag)
 			}
-		case []interface{}:
+		case []any:
 			for _, item := range v {
 				args = append(args, flag, fmt.Sprintf("%v", item))
 			}
-		case map[string]interface{}:
+		case map[string]any:
 			for k, subVal := range v {
 				args = append(args, flag, fmt.Sprintf("%s=%v", k, subVal))
 			}
