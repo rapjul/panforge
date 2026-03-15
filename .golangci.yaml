@@ -13,6 +13,10 @@ linters:
     - staticcheck # "Go vet on steroids".
     - govet # Official Go tool.
     - unused # Finds unused code.
+    - errorlint # Finds code that will cause problems with the error wrapping scheme.
+    - nilerr # Finds the code that returns nil even if it checks that the error is not nil.
+    - copyloopvar # Checks for pointers to enclosing loop variables.
+    - makezero # Finds slice declarations with non-zero initial length that are appended to.
 
     # --- Style ---
     - revive # Enforces style guides (replacement for golint).
@@ -20,6 +24,7 @@ linters:
     - whitespace # Check for unnecessary newlines.
     - goconst # Repeated string constants.
     - gocyclo # Cyclomatic complexity.
+    - nolintlint # Reports ill-formed or insufficient nolint directives.
 
   # Explicitly disable all linters by default to have full control over what is enabled.
   default: none
