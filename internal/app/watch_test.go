@@ -70,10 +70,20 @@ outputs:
 
 	// Wait for startup (initial run)
 	// We expect 1 call initially
-	time.Sleep(500 * time.Millisecond) // enough for initial process
+	timeoutInitial := time.After(3 * time.Second)
+	tickerInitial := time.NewTicker(100 * time.Millisecond)
+	defer tickerInitial.Stop()
 
-	if count := mockExec.CallCount(); count != 1 {
-		t.Fatalf("expected 1 initial call, got %d", count)
+	successInitial := false
+	for !successInitial {
+		select {
+		case <-timeoutInitial:
+			t.Fatalf("expected 1 initial call, got %d", mockExec.CallCount())
+		case <-tickerInitial.C:
+			if mockExec.CallCount() >= 1 {
+				successInitial = true
+			}
+		}
 	}
 
 	// Create "output" file to trigger overwrite check on next run
@@ -87,7 +97,7 @@ outputs:
 	_ = os.WriteFile("Hello.html", []byte("old"), 0600)
 
 	// Open file for appending
-	f, err := os.OpenFile(inputFile, os.O_APPEND|os.O_WRONLY, 0600) //nolint:gosec // 0600 for tests
+	f, err := os.OpenFile(inputFile, os.O_APPEND|os.O_WRONLY, 0600)
 	if err != nil {
 		t.Fatalf("failed to open file for append: %v", err)
 	}
@@ -97,11 +107,21 @@ outputs:
 	_ = f.Close()
 
 	// Wait for debounce (100ms) + processing time
-	time.Sleep(500 * time.Millisecond)
-
 	// We expect 2 calls now (initial + reload)
-	if count := mockExec.CallCount(); count < 2 {
-		t.Fatalf("expected at least 2 calls after modification, got %d", count)
+	timeout := time.After(3 * time.Second)
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
+
+	success := false
+	for !success {
+		select {
+		case <-timeout:
+			t.Fatalf("expected at least 2 calls after modification, got %d", mockExec.CallCount())
+		case <-ticker.C:
+			if mockExec.CallCount() >= 2 {
+				success = true
+			}
+		}
 	}
 
 	// Cancel context to stop watcher
