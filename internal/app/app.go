@@ -51,7 +51,7 @@ func (e *RealExecutor) Run(ctx context.Context, name string, args []string, stdo
 	if e.DryRun {
 		return nil
 	}
-	//nolint:gosec // Subprocess launched here is the intended behavior
+	//nolint:gosec,nolintlint // Subprocess launched here is the intended behavior
 	cmd := exec.CommandContext(ctx, name, args...)
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr

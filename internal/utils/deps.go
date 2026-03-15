@@ -33,7 +33,7 @@ func CheckTool(name string, versionFlag string) CheckResult {
 
 	// If explicit flag provided, try only that
 	if versionFlag != "" {
-		//nolint:gosec // Subprocess launched with variable is intended for tool checking
+		//nolint:gosec,nolintlint // Subprocess launched with variable is intended for tool checking
 		cmd := exec.Command(name, versionFlag)
 		out, err := cmd.Output()
 		if err == nil {
