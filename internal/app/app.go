@@ -51,6 +51,7 @@ func (e *RealExecutor) Run(ctx context.Context, name string, args []string, stdo
 	if e.DryRun {
 		return nil
 	}
+	//nolint:gosec // Subprocess launched here is the intended behavior
 	cmd := exec.CommandContext(ctx, name, args...)
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr
@@ -208,7 +209,6 @@ func Process(ctx context.Context, inputFile string, postArgs []string, opts opti
 	}
 
 	for _, t := range targets {
-		t := t // capture loop variable
 		g.Go(func() error {
 			if err := sem.Acquire(ctx, 1); err != nil {
 				return err
@@ -531,6 +531,7 @@ func GetRequiredTools(inputFile string, opts options.Options) ([]string, error) 
 	_, cfg, err := config.LoadConfig(inputFile)
 	if err != nil {
 		// If we can't load config, we can't determine specific tools, just return base
+		//nolint:nilerr // Intentional fallback to base tools if config load fails
 		return required, nil
 	}
 

@@ -65,7 +65,7 @@ outputs:
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tmpFile := filepath.Join(t.TempDir(), "config.yaml")
-			err := os.WriteFile(tmpFile, []byte(tt.yamlContent), 0600) //nolint:gosec // 0600 for tests
+			err := os.WriteFile(tmpFile, []byte(tt.yamlContent), 0600)
 			if err != nil {
 				t.Fatalf("failed to create temp file: %v", err)
 			}

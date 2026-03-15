@@ -146,6 +146,7 @@ func renderCommand(cmd any) string {
 	}
 
 	// Get terminal width
+	//nolint:gosec // Fd() result is always a valid int
 	width, _, err := term.GetSize(int(os.Stdout.Fd()))
 	if err != nil || width <= 0 {
 		width = 80 // Default fallback
