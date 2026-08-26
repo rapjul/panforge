@@ -48,9 +48,9 @@ output:
     toc: true # Generate a table of contents
     toc-depth: 2 # Table of contents depth
     toc-title: "Table of Contents" # Table of contents title
-    template: default.latex # Use a custom LaTeX template
-    include-in-header: header.tex # Include a custom header
-    include-in-footer: footer.tex # Include a custom footer
+    # template: default.latex # Use a custom LaTeX template
+    # include-in-header: header.tex # Include a custom header
+    # include-in-footer: footer.tex # Include a custom footer
     colorlinks: true # Use color links
     geometry: margin=2cm # Page geometry
     header-includes: |
@@ -68,11 +68,11 @@ output:
     # to: epub
     standalone: true # Generate a standalone EPUB file
     toc: true # Generate a table of contents
-    cover-image: cover.jpg # Optional cover image
+    # cover-image: cover.jpg # Optional cover image
     top-level-division: chapter # Optional top-level division (chapter or section)
     split-level: 2 # Optional split level (1 or 2)
     language: en # Optional language (e.g. en, fr, es, etc.)
     output-profile: epub2 # Optional output profile (epub2 or epub3)
-  docx:
-    # to: docx
-    reference-doc: reference.docx # Optional reference document to inherit styles from (e.g. font family, font size, etc.)
+  # docx:
+  #   to: docx
+  #   reference-doc: reference.docx # Optional reference document to inherit styles from (e.g. font family, font size, etc.)

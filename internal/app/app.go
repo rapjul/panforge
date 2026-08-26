@@ -69,65 +69,107 @@ func (e *RealExecutor) Run(ctx context.Context, name string, args []string, stdo
 //   - args: command line arguments
 //   - opts: parsed command line flags
 //   - executor: interface for running system commands
+//
+// Returns:
+//   - error: an error if execution fails
 func Run(ctx context.Context, cmd *cobra.Command, args []string, opts options.Options, executor CommandExecutor) error {
-	// 1. Parse Input File
-	inputFile, postArgs := parseArgs(args)
-	if inputFile == "" {
+	// 1. Parse Input Files
+	inputFiles, postArgs := parseArgs(cmd, args, opts.Inputs)
+	if len(inputFiles) == 0 {
 		if len(opts.Targets) > 0 || opts.Output != "" {
 			return fmt.Errorf("no input file found")
 		}
-		return cmd.Help()
+		if cmd != nil {
+			return cmd.Help()
+		}
+		return nil
 	}
 
-	// Resolve input file path (if not stdin)
-	if inputFile != "-" {
-		resolvedInput, err := utils.ResolvePath(inputFile)
-		if err != nil {
-			return fmt.Errorf("failed to resolve input file path: %w", err)
+	// Prevent fixed output collision when multiple files are given
+	if len(inputFiles) > 1 && opts.Output != "" {
+		if !strings.Contains(opts.Output, "{") {
+			return fmt.Errorf("cannot specify a fixed output filename (--output) when processing multiple input files; use a filename template (e.g., '{title}.{ext}') or process files individually")
 		}
-		inputFile = resolvedInput
-	}
-
-	// Handle stdin input
-	if inputFile == "-" {
-		tmpFile, err := os.CreateTemp("", "panforge-stdin-*.md")
-		if err != nil {
-			return fmt.Errorf("failed to create temp file for stdin: %w", err)
-		}
-		defer func() { _ = os.Remove(tmpFile.Name()) }()
-
-		if _, err := io.Copy(tmpFile, cmd.InOrStdin()); err != nil {
-			_ = tmpFile.Close()
-			return fmt.Errorf("failed to read stdin: %w", err)
-		}
-		if err := tmpFile.Close(); err != nil {
-			return fmt.Errorf("failed to close temp file: %w", err)
-		}
-		inputFile = tmpFile.Name()
 	}
 
 	// 2. Initial Config Loading & Execution
-	// If watch mode is enabled, we'll hand off to the Watcher (implemented elsewhere).
-	// For now, let's just call Process once if Watch is false.
-
-	// Determine default config path for watching
 	defaultConfigPath, _, _ := config.LoadDefaultConfig("default")
 
 	if opts.Watch {
+		if len(inputFiles) > 1 {
+			if opts.Logger != nil {
+				opts.Logger.Warn("watch mode only monitors the first input file", "file", inputFiles[0])
+			} else if !opts.Quiet {
+				fmt.Printf("Warning: watch mode only monitors the first input file (%s)\n", inputFiles[0])
+			}
+		}
+		inputFile := inputFiles[0]
+		if inputFile != "-" {
+			resolvedInput, err := utils.ResolvePath(inputFile)
+			if err != nil {
+				return fmt.Errorf("failed to resolve input file path: %w", err)
+			}
+			inputFile = resolvedInput
+		}
 		return Watch(ctx, inputFile, defaultConfigPath, postArgs, opts, executor)
 	}
 
-	return Process(ctx, inputFile, postArgs, opts, executor)
+	// Process each input file
+	for _, inputFile := range inputFiles {
+		isStdin := inputFile == "-"
+		var cleanupTemp string
+		if !isStdin {
+			resolvedInput, err := utils.ResolvePath(inputFile)
+			if err != nil {
+				return fmt.Errorf("failed to resolve input file path: %w", err)
+			}
+			inputFile = resolvedInput
+		} else {
+			var in io.Reader = os.Stdin
+			if cmd != nil {
+				in = cmd.InOrStdin()
+			}
+			tmpFile, err := os.CreateTemp("", "panforge-stdin-*.md")
+			if err != nil {
+				return fmt.Errorf("failed to create temp file for stdin: %w", err)
+			}
+			cleanupTemp = tmpFile.Name()
+
+			if _, err := io.Copy(tmpFile, in); err != nil {
+				_ = tmpFile.Close()
+				_ = os.Remove(cleanupTemp)
+				return fmt.Errorf("failed to read stdin: %w", err)
+			}
+			if err := tmpFile.Close(); err != nil {
+				_ = os.Remove(cleanupTemp)
+				return fmt.Errorf("failed to close temp file: %w", err)
+			}
+			inputFile = tmpFile.Name()
+		}
+
+		err := Process(ctx, inputFile, postArgs, opts, executor)
+		if cleanupTemp != "" {
+			_ = os.Remove(cleanupTemp)
+		}
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // Process handles a single run of the conversion logic.
 //
 // Parameters:
 //   - ctx: context for cancellation
-//   - inputFile: path to the markdown file to convert
+//   - inputFile: path to the Markdown file to convert
 //   - postArgs: additional arguments to pass to pandoc
 //   - opts: configuration options
 //   - executor: used to run the pandoc command
+//
+// Returns:
+//   - error: an error if processing fails
 //
 //nolint:gocyclo // Code is complex but manageable; refactoring deferred
 func Process(ctx context.Context, inputFile string, postArgs []string, opts options.Options, executor CommandExecutor) error {
@@ -259,7 +301,7 @@ func Process(ctx context.Context, inputFile string, postArgs []string, opts opti
 			baseDir := filepath.Dir(inputFile)
 
 			// Log effective configuration if verbose
-			if opts.Verbose {
+			if opts.Verbose && opts.Logger != nil {
 				opts.Logger.Debug("Effective configuration", "config", metaOut)
 			}
 
@@ -273,12 +315,17 @@ func Process(ctx context.Context, inputFile string, postArgs []string, opts opti
 				outputFile = pandoc.GenerateOutputFilename(inputFile, cfg, metaOut, fmtStr)
 			}
 
-			// If output file is relative, we strictly resolve it relative to the input file directory
-			// UNLESS --relative-output is set.
+			// If output file is relative, resolve relative to input directory
+			// UNLESS --relative-output is set or input file is from stdin.
+			isStdinTemp := strings.Contains(filepath.Base(inputFile), "panforge-stdin-")
 			if !filepath.IsAbs(outputFile) && !opts.RelativeOutput {
-				dir := filepath.Dir(inputFile)
-				if inputFile != "-" && dir != "." {
-					outputFile = filepath.Join(dir, outputFile)
+				if isStdinTemp {
+					outputFile = filepath.Join(".", outputFile)
+				} else {
+					dir := filepath.Dir(inputFile)
+					if inputFile != "-" && dir != "." {
+						outputFile = filepath.Join(dir, outputFile)
+					}
 				}
 			}
 
@@ -289,23 +336,25 @@ func Process(ctx context.Context, inputFile string, postArgs []string, opts opti
 			}
 			outputFile = resolvedOutput
 
-			// Check overwrite
-			if _, err := os.Stat(outputFile); err == nil {
-				// If watch mode is on, we implicitly allow overwrite (otherwise it would block execution)
-				if !opts.Force && !opts.Watch && !isOverwriteAllowed(cfg, metaOut) {
-					// Ask for confirmation
-					promptMu.Lock()
-					overwrite := askForConfirmation(outputFile, os.Stdin, os.Stderr)
-					promptMu.Unlock()
+			// Check overwrite (bypassed during dry-run)
+			if !opts.DryRun {
+				if _, err := os.Stat(outputFile); err == nil {
+					// If watch mode is on, we implicitly allow overwrite (otherwise it would block execution)
+					if !opts.Force && !opts.Watch && !isOverwriteAllowed(cfg, metaOut) {
+						// Ask for confirmation
+						promptMu.Lock()
+						overwrite := askForConfirmation(outputFile, os.Stdin, os.Stderr)
+						promptMu.Unlock()
 
-					if !overwrite {
-						// Log that we are skipping to avoid aborting other targets in the errgroup
-						if opts.Logger != nil {
-							opts.Logger.Warn("skipping target", "file", outputFile, "reason", "already exists and overwrite declined")
-						} else {
-							fmt.Fprintf(os.Stderr, "Skipping %s: file already exists and overwrite was declined\n", outputFile)
+						if !overwrite {
+							// Log that we are skipping to avoid aborting other targets in the errgroup
+							if opts.Logger != nil {
+								opts.Logger.Warn("skipping target", "file", outputFile, "reason", "already exists and overwrite declined")
+							} else {
+								fmt.Fprintf(os.Stderr, "Skipping %s: file already exists and overwrite was declined\n", outputFile)
+							}
+							return nil
 						}
-						return nil
 					}
 				}
 			}
@@ -322,7 +371,6 @@ func Process(ctx context.Context, inputFile string, postArgs []string, opts opti
 			pandocArgs = append(pandocArgs, pandoc.GetArgs(resolvedMetaOut)...)
 
 			// Add CLI args that were passed after inputs or generically
-			// (Note: this logic is simplified compared to Ruby's careful flag stripping)
 			for i := 0; i < len(postArgs); i++ {
 				arg := postArgs[i]
 				if arg == "-t" {
@@ -344,7 +392,6 @@ func Process(ctx context.Context, inputFile string, postArgs []string, opts opti
 			cmdStr := "pandoc " + strings.Join(quotedArgs, " ")
 
 			// Log execution
-			// We use Info level. If --quiet is set, logger should be configured to Error level only.
 			if opts.Logger != nil {
 				fullArgs := append([]string{"pandoc"}, quotedArgs...)
 				logArgs := []any{"command", cmdStr, "args", fullArgs}
@@ -375,10 +422,12 @@ func Process(ctx context.Context, inputFile string, postArgs []string, opts opti
 			if err := executor.Run(ctx, "pandoc", pandocArgs, os.Stdout, stderrWriter); err != nil {
 				// Extract last line of stderr for a cleaner error message if possible
 				errMsg := err.Error()
-				if stderrStr := stderrBuf.String(); stderrStr != "" {
-					lines := strings.Split(strings.TrimSpace(stderrStr), "\n")
-					if len(lines) > 0 {
-						errMsg = lines[len(lines)-1]
+				if stderrStr := strings.TrimSpace(stderrBuf.String()); stderrStr != "" {
+					lines := strings.Split(stderrStr, "\n")
+					if len(lines) > 5 {
+						errMsg = strings.Join(lines[len(lines)-5:], "\n")
+					} else {
+						errMsg = stderrStr
 					}
 				}
 				fmt.Fprintln(os.Stderr) // Separator
@@ -391,26 +440,48 @@ func Process(ctx context.Context, inputFile string, postArgs []string, opts opti
 	return g.Wait()
 }
 
-// parseArgs determines the input file from the command line arguments.
+// parseArgs determines the input files and trailing Pandoc arguments from CLI args.
 //
 // Parameters:
+//   - cmd: the cobra command being executed (optional)
 //   - args: command line arguments
+//   - explicitInputs: input files specified via --input / -i flags
 //
 // Returns:
-//   - string: input filename
-//   - []string: remaining arguments
-func parseArgs(args []string) (string, []string) {
-	// heuristics to find input file (first non-flag arg?)
-	// Cobra strips flags defined on it, so args here are non-flag args.
-	for i, arg := range args {
-		// Allow "-" as input file (stdin)
-		if arg == "-" || !strings.HasPrefix(arg, "-") {
-			inputFile := arg
-			postArgs := args[i+1:]
-			return inputFile, postArgs
+//   - []string: input filenames
+//   - []string: remaining passthrough arguments
+func parseArgs(cmd *cobra.Command, args []string, explicitInputs []string) ([]string, []string) {
+	var inputFiles []string
+	var postArgs []string
+
+	dashIdx := -1
+	if cmd != nil {
+		dashIdx = cmd.ArgsLenAtDash()
+	}
+
+	if dashIdx >= 0 && dashIdx <= len(args) {
+		for _, arg := range args[:dashIdx] {
+			if arg == "-" || !strings.HasPrefix(arg, "-") {
+				inputFiles = append(inputFiles, arg)
+			}
+		}
+		postArgs = append(postArgs, args[dashIdx:]...)
+	} else {
+		for i, arg := range args {
+			if arg == "-" || !strings.HasPrefix(arg, "-") {
+				inputFiles = append(inputFiles, arg)
+			} else {
+				postArgs = append(postArgs, args[i:]...)
+				break
+			}
 		}
 	}
-	return "", []string{}
+
+	if len(explicitInputs) > 0 {
+		inputFiles = append(inputFiles, explicitInputs...)
+	}
+
+	return inputFiles, postArgs
 }
 
 // DetermineTargets figures out which output formats to build.
@@ -502,7 +573,7 @@ func askForConfirmation(filename string, r io.Reader, w io.Writer) bool {
 // GetRequiredTools determines which tools are needed for the given input file.
 //
 // Parameters:
-//   - inputFile: path to the input markdown file
+//   - inputFile: path to the input Markdown file
 //   - opts: runtime options
 //
 // Returns:

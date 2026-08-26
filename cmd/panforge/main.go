@@ -3,6 +3,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"text/tabwriter"
@@ -21,9 +22,42 @@ var (
 	commit  = "none"
 )
 
-// main is the entry point for the panforge application.
-func main() {
-	var opts options.Options
+// printToolCheckRow formats and prints an individual tool dependency check row to the writer.
+//
+// Parameters:
+//   - w: writer where the formatted row is printed (typically a tabwriter)
+//   - res: the result of checking an individual tool dependency
+//
+// Returns:
+//   - bool: true if the tool was found, false otherwise
+func printToolCheckRow(w io.Writer, res utils.CheckResult) bool {
+	status := "FOUND"
+	if !res.Found {
+		status = "MISSING"
+	}
+	details := res.Version
+	if details == "" {
+		details = res.Path
+	}
+	if !res.Found {
+		if res.Error != nil {
+			details = res.Error.Error()
+		} else {
+			details = "not found"
+		}
+	} else if res.Version != "" {
+		// Truncate long version strings (e.g. verbose TeX engine banners) to preserve table alignment.
+		if len(details) > 50 {
+			details = details[:47] + "..."
+		}
+	}
+	_, _ = fmt.Fprintf(w, "%s\t%s\t%s\n", res.Name, status, details)
+	return res.Found
+}
+
+// newRootCmd builds the root cobra.Command along with its options and subcommands.
+func newRootCmd() (*cobra.Command, *options.Options) {
+	opts := &options.Options{}
 
 	versionStr := version
 	if version == "dev" {
@@ -72,7 +106,7 @@ To generate shell completion scripts, run:
 				DryRun:  opts.DryRun,
 				Verbose: opts.Verbose,
 			}
-			return app.Run(cmd.Context(), cmd, args, opts, executor)
+			return app.Run(cmd.Context(), cmd, args, *opts, executor)
 		},
 		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 			if len(args) > 0 {
@@ -84,10 +118,12 @@ To generate shell completion scripts, run:
 	}
 
 	// Define flags
+	rootCmd.Flags().StringSliceVarP(&opts.Inputs, "input", "i", []string{}, "Specify input file(s)")
 	rootCmd.Flags().StringSliceVarP(&opts.Targets, "to", "t", []string{}, "Specify output format(s)")
+	rootCmd.Flags().StringSliceVar(&opts.Targets, "target", []string{}, "Alias for --to")
 	rootCmd.Flags().BoolVarP(&opts.All, "all", "a", false, "Convert to all formats specified in the YAML header (default: false)")
 	rootCmd.Flags().StringVarP(&opts.Output, "output", "o", "", "Specify output filename (default: <filename>.<format>)")
-	rootCmd.Flags().BoolVarP(&opts.Force, "force", "f", false, "Overwrite existing output file(s) (default: false)")
+	rootCmd.Flags().BoolVarP(&opts.Force, "force", "F", false, "Overwrite existing output file(s) (default: false)")
 	rootCmd.Flags().BoolVarP(&opts.DryRun, "dry-run", "n", false, "Print the Pandoc command(s) without executing them (default: false)")
 	rootCmd.Flags().BoolVarP(&opts.Verbose, "verbose", "v", false, "Run Pandoc showing output (default: false)")
 	rootCmd.Flags().BoolVarP(&opts.Quiet, "quiet", "q", false, "Suppress program messages (default: false)")
@@ -120,17 +156,20 @@ To generate shell completion scripts, run:
 	// Init Command
 	var initOpts app.InitOptions
 	var initCmd = &cobra.Command{
-		Use:   "init",
+		Use:   "init [filename]",
 		Short: "Initialize a new project or file",
 		Long:  `Generate a default configuration file or a scaffolded Markdown file.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) > 0 {
+				initOpts.Filename = args[0]
+			}
 			return app.RunInit(initOpts)
 		},
 	}
 	initCmd.Flags().BoolVar(&initOpts.Config, "config", false, "Generate a default .panforge.yaml config file (default)")
 	initCmd.Flags().BoolVarP(&initOpts.Markdown, "markdown", "m", false, "Generate a sample input.md with frontmatter")
 	initCmd.Flags().StringSliceVarP(&initOpts.Formats, "to", "t", []string{}, "Specify output formats for the Markdown template (e.g. pdf,html,epub,docx)")
-	initCmd.Flags().BoolVarP(&initOpts.Force, "force", "f", false, "Overwrite existing files")
+	initCmd.Flags().BoolVarP(&initOpts.Force, "force", "F", false, "Overwrite existing files")
 
 	_ = initCmd.RegisterFlagCompletionFunc("to", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return app.KnownFormats, cobra.ShellCompDirectiveNoFileComp
@@ -148,35 +187,16 @@ If no file is provided, it checks for all known tools.`,
 			_, _ = fmt.Fprintln(w, "Tool\tStatus\tVersion/Path")
 			_, _ = fmt.Fprintln(w, "----\t------\t------------")
 
-			check := func(res utils.CheckResult) {
-				status := "FOUND"
-				if !res.Found {
-					status = "MISSING"
-				}
-				details := res.Version
-				if details == "" {
-					details = res.Path
-				}
-				if !res.Found {
-					details = res.Error.Error()
-				} else if res.Version != "" {
-					// Just take the version number part if possible?
-					// Pandoc version output is verbose "pandoc 3.1.2 ...", so it's fine.
-					if len(details) > 50 {
-						details = details[:47] + "..."
-					}
-				}
-				_, _ = fmt.Fprintf(w, "%s\t%s\t%s\n", res.Name, status, details)
-			}
+			allFound := true
 
 			// Determine what to check
 			var toolsToCheck []string
 			if len(args) > 0 {
 				inputFile := args[0]
 				var err error
-				toolsToCheck, err = app.GetRequiredTools(inputFile, opts)
+				toolsToCheck, err = app.GetRequiredTools(inputFile, *opts)
 				if err != nil {
-					fmt.Fprintf(os.Stderr, "Error analyzing file %s: %v\n", inputFile, err)
+					_, _ = fmt.Fprintf(os.Stderr, "Error analyzing file %s: %v\n", inputFile, err)
 					os.Exit(1)
 				}
 			} else {
@@ -191,7 +211,6 @@ If no file is provided, it checks for all known tools.`,
 					"wkhtmltopdf",
 					"pandoc-crossref",
 					"rsvg-convert",
-					// "python",
 				}
 			}
 
@@ -202,23 +221,28 @@ If no file is provided, it checks for all known tools.`,
 					continue
 				}
 				checked[tool] = true
-
-				// Special handling for known tools if we want to call specific Check functions?
-				// Actually CheckTool is generic now.
-				// But we might want to keep the "Nice Name" mapping or just use tool name.
-
-				// Re-using utils.CheckTool directly for everything is easiest.
-				// However, `utils.CheckPDFEngine` etc were just wrappers.
-				// Let's just use CheckTool directly.
-				check(utils.CheckTool(tool, ""))
+				if !printToolCheckRow(w, utils.CheckTool(tool, "")) {
+					allFound = false
+				}
 			}
 
 			_ = w.Flush()
+
+			if len(args) > 0 && !allFound {
+				os.Exit(1)
+			}
 		},
 	}
 
 	rootCmd.AddCommand(initCmd)
 	rootCmd.AddCommand(checkCmd)
+
+	return rootCmd, opts
+}
+
+// main is the entry point for the panforge application.
+func main() {
+	rootCmd, opts := newRootCmd()
 
 	if err := rootCmd.Execute(); err != nil {
 		if opts.Logger != nil {

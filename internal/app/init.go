@@ -10,15 +10,17 @@ import (
 	"github.com/rapjul/panforge/internal/templates"
 )
 
-// InitOptions holds flags for the init command.
+// InitOptions holds flags and arguments for the init command.
 type InitOptions struct {
+	// Filename specifies the optional destination file path.
+	Filename string
 	// Config triggers generation of the default configuration file.
 	Config bool
-	// Markdown triggers generation of a sample markdown file.
+	// Markdown triggers generation of a sample Markdown file.
 	Markdown bool
 	// Force enables overwriting existing files without prompt.
 	Force bool
-	// Formats is a list of targets to include in the scaffolded markdown.
+	// Formats is a list of targets to include in the scaffolded Markdown.
 	Formats []string
 }
 
@@ -38,14 +40,14 @@ func RunInit(opts InitOptions) error {
 	}
 
 	// Default to config if no specific type selected, or if --config is explicit
-	// We'll create it in the current directory as .panforge.yaml
+	// We'll create it in the current directory as .panforge.yaml (or specified filename)
 	return createConfig(opts)
 }
 
 // createConfig generates a default configuration file.
 //
 // Parameters:
-//   - opts: the initialization options containing flags (e.g. Force)
+//   - opts: the initialization options containing flags (e.g. Force, Filename)
 //
 // Returns:
 //   - error: an error if the config file cannot be created
@@ -54,14 +56,17 @@ func createConfig(opts InitOptions) error {
 	if err != nil {
 		return fmt.Errorf("failed to load config template: %w", err)
 	}
-	// For now, config template is static, but we could template it later
-	return createFile(".panforge.yaml", content, opts.Force)
+	targetFile := opts.Filename
+	if targetFile == "" {
+		targetFile = ".panforge.yaml"
+	}
+	return createFile(targetFile, content, opts.Force)
 }
 
-// createScaffold generates a sample markdown input file.
+// createScaffold generates a sample Markdown input file.
 //
 // Parameters:
-//   - opts: the initialization options containing formatting preferences
+//   - opts: the initialization options containing formatting preferences and optional filename
 //
 // Returns:
 //   - error: an error if the scaffold file cannot be created
@@ -87,7 +92,11 @@ func createScaffold(opts InitOptions) error {
 		return fmt.Errorf("failed to execute template: %w", err)
 	}
 
-	return createFile("input.md", buf.String(), opts.Force)
+	targetFile := opts.Filename
+	if targetFile == "" {
+		targetFile = "input.md"
+	}
+	return createFile(targetFile, buf.String(), opts.Force)
 }
 
 // createFile writes content to a file.

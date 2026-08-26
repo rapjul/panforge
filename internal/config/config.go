@@ -62,9 +62,9 @@ func LoadConfig(path string) (string, *Config, error) {
 
 // DataDirName returns the data directory for panforge.
 // It follows the XDG Base Directory specification:
-// 1. $XDG_CONFIG_HOME/panforge
-// 2. Windows: %APPDATA%/panforge
-// 3. macOS/Linux: ~/.config/panforge
+//  1. $XDG_CONFIG_HOME/panforge
+//  2. Windows: %APPDATA%/panforge
+//  3. macOS/Linux: ~/.config/panforge
 //
 // Returns:
 //   - string: the path to the data directory
@@ -88,9 +88,12 @@ func DataDirName() string {
 }
 
 // LoadDefaultConfig tries to load a default YAML configuration by name or path.
+// If name is empty or "default", it checks:
+//  1. Current working directory for .panforge.yaml, panforge.yaml, .panforge.yml, panforge.yml
+//  2. Data directory (~/.config/panforge/default.yaml or %APPDATA%/panforge/default.yaml)
 //
 // Parameters:
-//   - `name`: either a direct file path or the name of a config file in the default data directory
+//   - name: either a direct file path or the name of a config file in the default data directory
 //
 // Returns:
 //   - string: absolute path of the loaded file
@@ -109,10 +112,32 @@ func LoadDefaultConfig(name string) (string, *Config, error) {
 		return "", nil, fmt.Errorf("could not find file %s", name)
 	}
 
-	// look in ~/.panforge/
-	path := filepath.Join(DataDirName(), name+".yaml")
-	if _, err := os.Stat(path); err == nil {
-		return LoadConfig(path)
+	// If looking for "default", check local project directory first
+	if name == "default" {
+		localCandidates := []string{
+			".panforge.yaml",
+			"panforge.yaml",
+			".panforge.yml",
+			"panforge.yml",
+		}
+		for _, candidate := range localCandidates {
+			if _, err := os.Stat(candidate); err == nil {
+				return LoadConfig(candidate)
+			}
+		}
+	}
+
+	// look in ~/.config/panforge/ (or platform equivalent)
+	dataDir := DataDirName()
+	if dataDir != "" {
+		path := filepath.Join(dataDir, name+".yaml")
+		if _, err := os.Stat(path); err == nil {
+			return LoadConfig(path)
+		}
+		pathYml := filepath.Join(dataDir, name+".yml")
+		if _, err := os.Stat(pathYml); err == nil {
+			return LoadConfig(pathYml)
+		}
 	}
 	return "", &Config{}, nil
 }
