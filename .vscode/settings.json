@@ -23,5 +23,6 @@
   "makefile.configureOnOpen": false,
   "cSpell.words": [
     "golangci"
-  ]
+  ],
+  "languageToolLinter.languageTool.disabledRules": "ARROWS,UNLIKELY_OPENING_PUNCTUATION,WHITESPACE_RULE"
 }
