@@ -2,8 +2,82 @@ package main
 
 import (
 	"bytes"
+	"runtime/debug"
 	"testing"
 )
+
+// TestInitVersion verifies that initVersion correctly populates version and commit from BuildInfo.
+func TestInitVersion(t *testing.T) {
+	origVersion := version
+	origCommit := commit
+	defer func() {
+		version = origVersion
+		commit = origCommit
+	}()
+
+	t.Run("nil BuildInfo", func(t *testing.T) {
+		version = "dev"
+		commit = "none"
+		initVersion(nil)
+		if version != "dev" || commit != "none" {
+			t.Errorf("expected version='dev', commit='none', got version=%q, commit=%q", version, commit)
+		}
+	})
+
+	t.Run("valid module version and revision", func(t *testing.T) {
+		version = "dev"
+		commit = "none"
+		info := &debug.BuildInfo{
+			Main: debug.Module{
+				Version: "v0.3.0",
+			},
+			Settings: []debug.BuildSetting{
+				{Key: "vcs.revision", Value: "1234567890abcdef"},
+			},
+		}
+		initVersion(info)
+		if version != "v0.3.0" {
+			t.Errorf("expected version='v0.3.0', got %q", version)
+		}
+		if commit != "1234567" {
+			t.Errorf("expected commit='1234567', got %q", commit)
+		}
+	})
+
+	t.Run("does not overwrite ldflags version and commit", func(t *testing.T) {
+		version = "v1.0.0"
+		commit = "custom"
+		info := &debug.BuildInfo{
+			Main: debug.Module{
+				Version: "v0.3.0",
+			},
+			Settings: []debug.BuildSetting{
+				{Key: "vcs.revision", Value: "1234567890abcdef"},
+			},
+		}
+		initVersion(info)
+		if version != "v1.0.0" {
+			t.Errorf("expected version='v1.0.0', got %q", version)
+		}
+		if commit != "custom" {
+			t.Errorf("expected commit='custom', got %q", commit)
+		}
+	})
+
+	t.Run("ignores devel version", func(t *testing.T) {
+		version = "dev"
+		commit = "none"
+		info := &debug.BuildInfo{
+			Main: debug.Module{
+				Version: "(devel)",
+			},
+		}
+		initVersion(info)
+		if version != "dev" {
+			t.Errorf("expected version='dev', got %q", version)
+		}
+	})
+}
 
 // TestFormatVersion tests version string formatting for development and release builds.
 func TestFormatVersion(t *testing.T) {

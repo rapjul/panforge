@@ -4,6 +4,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"runtime/debug"
 
 	"github.com/spf13/cobra"
 
@@ -17,6 +18,38 @@ var (
 	version = "dev"
 	commit  = "none"
 )
+
+// initVersion extracts the version and revision information from Go module build info
+// if they were not already provided at link time (e.g. via GoReleaser ldflags).
+//
+// Parameters:
+//   - info: build info metadata returned by debug.ReadBuildInfo()
+func initVersion(info *debug.BuildInfo) {
+	if info == nil {
+		return
+	}
+	if version == "dev" && info.Main.Version != "" && info.Main.Version != "(devel)" {
+		version = info.Main.Version
+	}
+	if commit == "none" {
+		for _, setting := range info.Settings {
+			if setting.Key == "vcs.revision" && setting.Value != "" {
+				commit = setting.Value
+				if len(commit) > 7 {
+					commit = commit[:7]
+				}
+				break
+			}
+		}
+	}
+}
+
+// init initializes the runtime configuration such as version metadata.
+func init() {
+	if info, ok := debug.ReadBuildInfo(); ok {
+		initVersion(info)
+	}
+}
 
 // formatVersion formats the version identifier with optional commit hash for development builds.
 //
