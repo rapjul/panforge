@@ -91,7 +91,7 @@ panforge *.md -- --toc
 - `-n, --dry-run`: Print the `pandoc` commands that would be executed without running them.
 - `-v, --verbose`: Enable verbose logging.
 - `-q, --quiet`: Suppress standard output messages.
-- `-w, --watch`: Watch input file and configuration for changes and automatically re-run.
+- `-w, --watch`: Watch input file and configuration for changes and automatically re-run (implies `--force`).
 - `-c, --concurrency <num>`: Limit number of concurrent Pandoc processes (default: number of CPUs).
 - `-r, --relative-output`: Resolve relative output paths against CWD instead of input file directory.
 - `--log <file>`: Append logs to the specified file.

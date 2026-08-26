@@ -92,7 +92,7 @@ To generate shell completion scripts, run:
 	rootCmd.Flags().BoolVar(&opts.RelativeOutput, "relative-to-cwd", false, "Alias for --relative-output")
 	_ = rootCmd.Flags().MarkHidden("relative-to-cwd")
 
-	rootCmd.Flags().BoolVarP(&opts.Watch, "watch", "w", false, "Watch input file for changes and re-run (implies --force for overwriting existing output file(s))")
+	rootCmd.Flags().BoolVarP(&opts.Watch, "watch", "w", false, "Watch input file for changes and re-run (implies --force)")
 
 	// Disable auto-sorting of flags to preserve order of post-args if mixed
 	rootCmd.Flags().SortFlags = false
