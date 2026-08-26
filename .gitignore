@@ -147,3 +147,4 @@ _artifacts/
 # Build Artifacts
 dist/
 vendor/
+test/test-files/Markdown Only Input*.html
