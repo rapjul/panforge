@@ -3,10 +3,7 @@ package main
 
 import (
 	"fmt"
-	"io"
-	"log/slog"
 	"os"
-	"text/tabwriter"
 
 	"github.com/spf13/cobra"
 
@@ -14,7 +11,6 @@ import (
 	"github.com/rapjul/panforge/internal/options"
 	"github.com/rapjul/panforge/internal/pandoc"
 	"github.com/rapjul/panforge/internal/ui"
-	"github.com/rapjul/panforge/internal/utils"
 )
 
 var (
@@ -22,51 +18,28 @@ var (
 	commit  = "none"
 )
 
-// printToolCheckRow formats and prints an individual tool dependency check row to the writer.
+// formatVersion formats the version identifier with optional commit hash for development builds.
 //
 // Parameters:
-//   - w: writer where the formatted row is printed (typically a tabwriter)
-//   - res: the result of checking an individual tool dependency
+//   - v: base version string
+//   - commit: commit hash or identifier
 //
 // Returns:
-//   - bool: true if the tool was found, false otherwise
-func printToolCheckRow(w io.Writer, res utils.CheckResult) bool {
-	status := "FOUND"
-	if !res.Found {
-		status = "MISSING"
+//   - string: formatted version string
+func formatVersion(v, commit string) string {
+	if v == "dev" {
+		return fmt.Sprintf("%s (commit: %s)", v, commit)
 	}
-	details := res.Version
-	if details == "" {
-		details = res.Path
-	}
-	if !res.Found {
-		if res.Error != nil {
-			details = res.Error.Error()
-		} else {
-			details = "not found"
-		}
-	} else if res.Version != "" {
-		// Truncate long version strings (e.g. verbose TeX engine banners) to preserve table alignment.
-		if len(details) > 50 {
-			details = details[:47] + "..."
-		}
-	}
-	_, _ = fmt.Fprintf(w, "%s\t%s\t%s\n", res.Name, status, details)
-	return res.Found
+	return v
 }
 
 // newRootCmd builds the root cobra.Command along with its options and subcommands.
 func newRootCmd() (*cobra.Command, *options.Options) {
 	opts := &options.Options{}
 
-	versionStr := version
-	if version == "dev" {
-		versionStr = fmt.Sprintf("%s (commit: %s)", version, commit)
-	}
-
 	var rootCmd = &cobra.Command{
 		Use:     "panforge [flags] <file>",
-		Version: versionStr,
+		Version: formatVersion(version, commit),
 		Short:   "A wrapper for pandoc with complex configurations",
 		Long: `panforge enables complex Pandoc conversions using a YAML configuration
   and metadata in the Markdown document's frontmatter.
@@ -85,22 +58,7 @@ To generate shell completion scripts, run:
 		SilenceUsage:  true, // Don't show usage on runtime errors
 		SilenceErrors: true, // Don't print errors automatically, we handle them
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Configure Logging
-			var handler slog.Handler
-			if opts.JSON {
-				handler = slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
-					Level: slog.LevelInfo,
-				})
-			} else {
-				level := slog.LevelInfo
-				if opts.Verbose {
-					level = slog.LevelDebug
-				} else if opts.Quiet {
-					level = slog.LevelError
-				}
-				handler = ui.NewPrettyHandler(level)
-			}
-			opts.Logger = slog.New(handler)
+			opts.Logger = ui.NewLogger(opts.Verbose, opts.Quiet, opts.JSON)
 
 			executor := &app.RealExecutor{
 				DryRun:  opts.DryRun,
@@ -182,55 +140,8 @@ To generate shell completion scripts, run:
 		Long: `Check for installed dependencies.
 If a file is provided, it checks only for the tools required by that file's configuration.
 If no file is provided, it checks for all known tools.`,
-		Run: func(cmd *cobra.Command, args []string) {
-			w := tabwriter.NewWriter(os.Stdout, 0, 0, 3, ' ', 0)
-			_, _ = fmt.Fprintln(w, "Tool\tStatus\tVersion/Path")
-			_, _ = fmt.Fprintln(w, "----\t------\t------------")
-
-			allFound := true
-
-			// Determine what to check
-			var toolsToCheck []string
-			if len(args) > 0 {
-				inputFile := args[0]
-				var err error
-				toolsToCheck, err = app.GetRequiredTools(inputFile, *opts)
-				if err != nil {
-					_, _ = fmt.Fprintf(os.Stderr, "Error analyzing file %s: %v\n", inputFile, err)
-					os.Exit(1)
-				}
-			} else {
-				// Default list of all interesting tools
-				toolsToCheck = []string{
-					"pandoc",
-					"typst",
-					"pdflatex",
-					"xelatex",
-					"lualatex",
-					"tectonic",
-					"wkhtmltopdf",
-					"pandoc-crossref",
-					"rsvg-convert",
-				}
-			}
-
-			// deduplicate just in case
-			checked := make(map[string]bool)
-			for _, tool := range toolsToCheck {
-				if checked[tool] {
-					continue
-				}
-				checked[tool] = true
-				if !printToolCheckRow(w, utils.CheckTool(tool, "")) {
-					allFound = false
-				}
-			}
-
-			_ = w.Flush()
-
-			if len(args) > 0 && !allFound {
-				os.Exit(1)
-			}
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return app.RunCheck(cmd.Context(), cmd.OutOrStdout(), cmd.ErrOrStderr(), args, *opts)
 		},
 	}
 

@@ -24,6 +24,15 @@ import (
 	"github.com/rapjul/panforge/internal/utils"
 )
 
+const (
+	// DefaultFormat defines the fallback format when no targets are specified.
+	DefaultFormat = "html"
+	// DefaultPDFEngine defines the default PDF rendering engine.
+	DefaultPDFEngine = "pdflatex"
+	// ToolPandoc defines the pandoc executable name.
+	ToolPandoc = "pandoc"
+)
+
 // CommandExecutor abstracts command execution for testing purposes.
 // It allows mocking the actual os/exec calls in unit tests.
 type CommandExecutor interface {
@@ -117,7 +126,7 @@ func Run(ctx context.Context, cmd *cobra.Command, args []string, opts options.Op
 	// Process each input file
 	for _, inputFile := range inputFiles {
 		isStdin := inputFile == "-"
-		var cleanupTemp string
+		var cleanupTemp func()
 		if !isStdin {
 			resolvedInput, err := utils.ResolvePath(inputFile)
 			if err != nil {
@@ -129,27 +138,16 @@ func Run(ctx context.Context, cmd *cobra.Command, args []string, opts options.Op
 			if cmd != nil {
 				in = cmd.InOrStdin()
 			}
-			tmpFile, err := os.CreateTemp("", "panforge-stdin-*.md")
+			var err error
+			inputFile, cleanupTemp, err = createStdinTempFile(in)
 			if err != nil {
-				return fmt.Errorf("failed to create temp file for stdin: %w", err)
+				return err
 			}
-			cleanupTemp = tmpFile.Name()
-
-			if _, err := io.Copy(tmpFile, in); err != nil {
-				_ = tmpFile.Close()
-				_ = os.Remove(cleanupTemp)
-				return fmt.Errorf("failed to read stdin: %w", err)
-			}
-			if err := tmpFile.Close(); err != nil {
-				_ = os.Remove(cleanupTemp)
-				return fmt.Errorf("failed to close temp file: %w", err)
-			}
-			inputFile = tmpFile.Name()
 		}
 
 		err := Process(ctx, inputFile, postArgs, opts, executor)
-		if cleanupTemp != "" {
-			_ = os.Remove(cleanupTemp)
+		if cleanupTemp != nil {
+			cleanupTemp()
 		}
 		if err != nil {
 			return err
@@ -170,8 +168,6 @@ func Run(ctx context.Context, cmd *cobra.Command, args []string, opts options.Op
 //
 // Returns:
 //   - error: an error if processing fails
-//
-//nolint:gocyclo // Code is complex but manageable; refactoring deferred
 func Process(ctx context.Context, inputFile string, postArgs []string, opts options.Options, executor CommandExecutor) error {
 	// 2. Initial Config Loading
 	formats, err := pandoc.GetSupportedFormats()
@@ -194,36 +190,7 @@ func Process(ctx context.Context, inputFile string, postArgs []string, opts opti
 	}
 
 	_, defaultCfg, _ := config.LoadDefaultConfig("default")
-	if defaultCfg != nil {
-		if cfg.Title == "" {
-			cfg.Title = defaultCfg.Title
-		}
-		if cfg.FilenameTemplate == "" {
-			cfg.FilenameTemplate = defaultCfg.FilenameTemplate
-		}
-		if cfg.SlugifyFilename == nil {
-			cfg.SlugifyFilename = defaultCfg.SlugifyFilename
-		}
-		if cfg.OutputMap == nil {
-			cfg.OutputMap = defaultCfg.OutputMap
-		} else {
-			for k, v := range defaultCfg.OutputMap {
-				if _, exists := cfg.OutputMap[k]; !exists {
-					cfg.OutputMap[k] = v
-				}
-			}
-		}
-		if cfg.Generic == nil {
-			cfg.Generic = make(map[string]any)
-		}
-		if defaultCfg.Generic != nil {
-			for k, v := range defaultCfg.Generic {
-				if _, exists := cfg.Generic[k]; !exists {
-					cfg.Generic[k] = v
-				}
-			}
-		}
-	}
+	mergeDefaultConfig(cfg, defaultCfg)
 
 	// 3. Determine Targets
 	targets := DetermineTargets(opts, cfg)
@@ -257,50 +224,9 @@ func Process(ctx context.Context, inputFile string, postArgs []string, opts opti
 			}
 			defer sem.Release(1)
 
-			// Resolve Format
-			fmtStr := pandoc.NormalizeFormat(t)
-			// Check if t maps to an output entry in YAML
-			var metaOut map[string]any
-
-			// Logic to find specific output config in YAML:
-			// logic similar to ruby resolve_target_format
-			if val, ok := cfg.OutputMap[t]; ok {
-				if m, ok := val.(map[string]any); ok {
-					metaOut = m
-					if to, ok := m["to"].(string); ok && to != "" {
-						fmtStr = to
-					}
-				}
-			} else if val, ok := cfg.Generic[t]; ok {
-				if m, ok := val.(map[string]any); ok {
-					metaOut = m
-				}
-			}
-
-			if metaOut == nil {
-				metaOut = make(map[string]any)
-			}
-
-			// Merge Generic config into metaOut (if not present), BUT blacklist specific metadata keys
-			// that result in invalid Pandoc flags (e.g. "--creator").
-			if cfg.Generic != nil {
-				for k, v := range cfg.Generic {
-					// Check if k is ignored
-					if pandoc.IgnoredMetadataKeys[k] {
-						continue
-					}
-
-					if _, exists := metaOut[k]; !exists {
-						metaOut[k] = v
-					}
-				}
-			}
-
-			// Validate metadata (check for existence of referenced files)
-			// Determine baseDir from inputFile
+			fmtStr, metaOut := resolveTargetConfig(t, cfg)
 			baseDir := filepath.Dir(inputFile)
 
-			// Log effective configuration if verbose
 			if opts.Verbose && opts.Logger != nil {
 				opts.Logger.Debug("Effective configuration", "config", metaOut)
 			}
@@ -309,91 +235,36 @@ func Process(ctx context.Context, inputFile string, postArgs []string, opts opti
 				return err
 			}
 
-			// Generate Output Filename
-			outputFile := opts.Output
-			if outputFile == "" {
-				outputFile = pandoc.GenerateOutputFilename(inputFile, cfg, metaOut, fmtStr)
-			}
-
-			// If output file is relative, resolve relative to input directory
-			// UNLESS --relative-output is set or input file is from stdin.
-			isStdinTemp := strings.Contains(filepath.Base(inputFile), "panforge-stdin-")
-			if !filepath.IsAbs(outputFile) && !opts.RelativeOutput {
-				if isStdinTemp {
-					outputFile = filepath.Join(".", outputFile)
-				} else {
-					dir := filepath.Dir(inputFile)
-					if inputFile != "-" && dir != "." {
-						outputFile = filepath.Join(dir, outputFile)
-					}
-				}
-			}
-
-			// Resolve output file path (canonicalize)
-			resolvedOutput, err := utils.ResolvePath(outputFile)
+			outputFile, err := resolveOutputPath(inputFile, opts.Output, fmtStr, cfg, metaOut, opts.RelativeOutput)
 			if err != nil {
-				return fmt.Errorf("failed to resolve output file path: %w", err)
+				return err
 			}
-			outputFile = resolvedOutput
 
-			// Check overwrite (bypassed during dry-run)
-			if !opts.DryRun {
-				if _, err := os.Stat(outputFile); err == nil {
-					// If watch mode is on, we implicitly allow overwrite (otherwise it would block execution)
-					if !opts.Force && !opts.Watch && !isOverwriteAllowed(cfg, metaOut) {
-						// Ask for confirmation
-						promptMu.Lock()
-						overwrite := askForConfirmation(outputFile, os.Stdin, os.Stderr)
-						promptMu.Unlock()
+			allowed, err := confirmOverwrite(outputFile, cfg, metaOut, opts, &promptMu)
+			if err != nil {
+				return err
+			}
+			if !allowed {
+				if opts.Logger != nil {
+					opts.Logger.Warn("skipping target", "file", outputFile, "reason", "already exists and overwrite declined")
+				} else {
+					fmt.Fprintf(os.Stderr, "Skipping %s: file already exists and overwrite was declined\n", outputFile)
+				}
+				return nil
+			}
 
-						if !overwrite {
-							// Log that we are skipping to avoid aborting other targets in the errgroup
-							if opts.Logger != nil {
-								opts.Logger.Warn("skipping target", "file", outputFile, "reason", "already exists and overwrite declined")
-							} else {
-								fmt.Fprintf(os.Stderr, "Skipping %s: file already exists and overwrite was declined\n", outputFile)
-							}
-							return nil
-						}
+			pandocArgs, cmdStr := buildPandocCommand(inputFile, outputFile, fmtStr, metaOut, baseDir, postArgs)
+
+			if opts.Logger != nil {
+				quotedArgs := make([]string, 0, len(pandocArgs))
+				for _, arg := range pandocArgs {
+					if strings.Contains(arg, " ") || strings.Contains(arg, "\"") {
+						quotedArgs = append(quotedArgs, fmt.Sprintf("%q", arg))
+					} else {
+						quotedArgs = append(quotedArgs, arg)
 					}
 				}
-			}
-
-			// Resolve relative paths in metadata
-			resolvedMetaOut := pandoc.ResolveMetadataPaths(metaOut, baseDir)
-
-			// Build Command
-			pandocArgs := []string{inputFile}
-			pandocArgs = append(pandocArgs, "--to", fmtStr)
-			pandocArgs = append(pandocArgs, "--output", outputFile)
-
-			// Add YAML args
-			pandocArgs = append(pandocArgs, pandoc.GetArgs(resolvedMetaOut)...)
-
-			// Add CLI args that were passed after inputs or generically
-			for i := 0; i < len(postArgs); i++ {
-				arg := postArgs[i]
-				if arg == "-t" {
-					postArgs[i] = "--to"
-				}
-			}
-			pandocArgs = append(pandocArgs, postArgs...)
-
-			// Execute
-			// Improve logging to show quoted arguments
-			var quotedArgs []string
-			for _, arg := range pandocArgs {
-				if strings.Contains(arg, " ") || strings.Contains(arg, "\"") {
-					quotedArgs = append(quotedArgs, fmt.Sprintf("%q", arg))
-				} else {
-					quotedArgs = append(quotedArgs, arg)
-				}
-			}
-			cmdStr := "pandoc " + strings.Join(quotedArgs, " ")
-
-			// Log execution
-			if opts.Logger != nil {
-				fullArgs := append([]string{"pandoc"}, quotedArgs...)
+				fullArgs := append([]string{ToolPandoc}, quotedArgs...)
 				logArgs := []any{"command", cmdStr, "args", fullArgs}
 				msg := "executing the command"
 				if opts.DryRun {
@@ -412,32 +283,286 @@ func Process(ctx context.Context, inputFile string, postArgs []string, opts opti
 				logMu.Unlock()
 			}
 
-			// Use executor
-			// Note: Writing to os.Stdout/Stderr concurrently might interleave output
-
-			// Capture stderr to provide better error messages
-			var stderrBuf strings.Builder
-			stderrWriter := io.MultiWriter(os.Stderr, &stderrBuf)
-
-			if err := executor.Run(ctx, "pandoc", pandocArgs, os.Stdout, stderrWriter); err != nil {
-				// Extract last line of stderr for a cleaner error message if possible
-				errMsg := err.Error()
-				if stderrStr := strings.TrimSpace(stderrBuf.String()); stderrStr != "" {
-					lines := strings.Split(stderrStr, "\n")
-					if len(lines) > 5 {
-						errMsg = strings.Join(lines[len(lines)-5:], "\n")
-					} else {
-						errMsg = stderrStr
-					}
-				}
-				fmt.Fprintln(os.Stderr) // Separator
-				return fmt.Errorf("an error occurred running the pandoc command: %s", errMsg)
-			}
-			return nil
+			return executePandoc(ctx, executor, pandocArgs)
 		})
 	}
 
 	return g.Wait()
+}
+
+// createStdinTempFile reads standard input into a temporary file and returns its path and a cleanup callback.
+//
+// Parameters:
+//   - r: reader to consume standard input from
+//
+// Returns:
+//   - string: path to the created temporary file
+//   - func(): cleanup function to remove the temporary file
+//   - error: an error if file creation or copying fails
+func createStdinTempFile(r io.Reader) (string, func(), error) {
+	tmpFile, err := os.CreateTemp("", "panforge-stdin-*.md")
+	if err != nil {
+		return "", nil, fmt.Errorf("failed to create temp file for stdin: %w", err)
+	}
+	tmpName := tmpFile.Name()
+	cleanup := func() {
+		_ = os.Remove(tmpName)
+	}
+
+	if _, err := io.Copy(tmpFile, r); err != nil {
+		_ = tmpFile.Close()
+		cleanup()
+		return "", nil, fmt.Errorf("failed to read stdin: %w", err)
+	}
+	if err := tmpFile.Close(); err != nil {
+		cleanup()
+		return "", nil, fmt.Errorf("failed to close temp file: %w", err)
+	}
+	return tmpName, cleanup, nil
+}
+
+// mergeDefaultConfig merges missing configuration values from defaultCfg into cfg.
+//
+// Parameters:
+//   - cfg: destination configuration to receive default values
+//   - defaultCfg: source default configuration
+func mergeDefaultConfig(cfg, defaultCfg *config.Config) {
+	if defaultCfg == nil || cfg == nil {
+		return
+	}
+	if cfg.Title == "" {
+		cfg.Title = defaultCfg.Title
+	}
+	if cfg.FilenameTemplate == "" {
+		cfg.FilenameTemplate = defaultCfg.FilenameTemplate
+	}
+	if cfg.SlugifyFilename == nil {
+		cfg.SlugifyFilename = defaultCfg.SlugifyFilename
+	}
+	if cfg.OutputMap == nil {
+		cfg.OutputMap = defaultCfg.OutputMap
+	} else {
+		for k, v := range defaultCfg.OutputMap {
+			if _, exists := cfg.OutputMap[k]; !exists {
+				cfg.OutputMap[k] = v
+			}
+		}
+	}
+	if cfg.Generic == nil {
+		cfg.Generic = make(map[string]any)
+	}
+	if defaultCfg.Generic != nil {
+		for k, v := range defaultCfg.Generic {
+			if _, exists := cfg.Generic[k]; !exists {
+				cfg.Generic[k] = v
+			}
+		}
+	}
+}
+
+// resolveTargetConfig resolves the output format string and format-specific metadata map.
+//
+// Parameters:
+//   - target: the target format name (e.g. "html", "pdf", "custom_target")
+//   - cfg: document configuration containing OutputMap and Generic settings
+//
+// Returns:
+//   - string: normalized pandoc format identifier
+//   - map[string]any: merged metadata options for the format
+func resolveTargetConfig(target string, cfg *config.Config) (string, map[string]any) {
+	fmtStr := pandoc.NormalizeFormat(target)
+	var metaOut map[string]any
+
+	if cfg != nil {
+		if val, ok := cfg.OutputMap[target]; ok {
+			if m, ok := val.(map[string]any); ok {
+				metaOut = m
+				if to, ok := m["to"].(string); ok && to != "" {
+					fmtStr = to
+				}
+			}
+		} else if val, ok := cfg.Generic[target]; ok {
+			if m, ok := val.(map[string]any); ok {
+				metaOut = m
+			}
+		}
+
+		if metaOut == nil {
+			metaOut = make(map[string]any)
+		}
+
+		if cfg.Generic != nil {
+			for k, v := range cfg.Generic {
+				if pandoc.IgnoredMetadataKeys[k] {
+					continue
+				}
+				if _, exists := metaOut[k]; !exists {
+					metaOut[k] = v
+				}
+			}
+		}
+	} else {
+		metaOut = make(map[string]any)
+	}
+
+	return fmtStr, metaOut
+}
+
+// resolveOutputPath calculates the canonical destination path for a target conversion.
+//
+// Parameters:
+//   - inputFile: path to the source Markdown document
+//   - explicitOutput: user-specified output flag value (if any)
+//   - fmtStr: target output format string
+//   - cfg: document configuration
+//   - metaOut: format-specific metadata map
+//   - relativeOutput: whether --relative-output was specified
+//
+// Returns:
+//   - string: absolute or canonical resolved output path
+//   - error: an error if path resolution fails
+func resolveOutputPath(inputFile, explicitOutput, fmtStr string, cfg *config.Config, metaOut map[string]any, relativeOutput bool) (string, error) {
+	outputFile := explicitOutput
+	if outputFile == "" {
+		outputFile = pandoc.GenerateOutputFilename(inputFile, cfg, metaOut, fmtStr)
+	}
+
+	// If output file is relative, resolve relative to input directory
+	// UNLESS --relative-output is set or input file is from stdin.
+	isStdinTemp := strings.Contains(filepath.Base(inputFile), "panforge-stdin-")
+	if !filepath.IsAbs(outputFile) && !relativeOutput {
+		if isStdinTemp {
+			// When input is piped from stdin, the temp file lives in the OS temp directory.
+			// Relative output paths must resolve against the working directory, not the temp directory.
+			outputFile = filepath.Join(".", outputFile)
+		} else {
+			dir := filepath.Dir(inputFile)
+			if inputFile != "-" && dir != "." {
+				outputFile = filepath.Join(dir, outputFile)
+			}
+		}
+	}
+
+	resolvedOutput, err := utils.ResolvePath(outputFile)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve output file path: %w", err)
+	}
+	return resolvedOutput, nil
+}
+
+// confirmOverwrite checks if an existing file may be overwritten.
+//
+// Parameters:
+//   - outputFile: path of the output file to check
+//   - cfg: document configuration
+//   - metaOut: format-specific metadata map
+//   - opts: CLI options (Force, Watch, DryRun)
+//   - promptMu: mutex to synchronize terminal prompts during concurrent execution
+//
+// Returns:
+//   - bool: true if overwrite is permitted or confirmed, false if skipped
+//   - error: an error if prompt interaction fails
+func confirmOverwrite(outputFile string, cfg *config.Config, metaOut map[string]any, opts options.Options, promptMu *sync.Mutex) (bool, error) {
+	if opts.DryRun {
+		return true, nil
+	}
+	if _, err := os.Stat(outputFile); err != nil {
+		return true, nil
+	}
+
+	// In watch mode, overwrite is implicitly permitted so file changes trigger live rebuilds without blocking.
+	if opts.Force || opts.Watch || isOverwriteAllowed(cfg, metaOut) {
+		if opts.Verbose && opts.Logger != nil {
+			reason := "force flag set"
+			if opts.Watch {
+				reason = "watch mode active"
+			} else if isOverwriteAllowed(cfg, metaOut) {
+				reason = "overwrite allowed in configuration"
+			}
+			opts.Logger.Debug("overwriting existing output file", "file", outputFile, "reason", reason)
+		}
+		return true, nil
+	}
+
+	if promptMu != nil {
+		promptMu.Lock()
+		defer promptMu.Unlock()
+	}
+	return askForConfirmation(outputFile, os.Stdin, os.Stderr), nil
+}
+
+// buildPandocCommand assembles the argument list and display string for pandoc invocation.
+//
+// Parameters:
+//   - inputFile: input document path
+//   - outputFile: output destination path
+//   - fmtStr: output format identifier
+//   - metaOut: metadata key-value map for the format
+//   - baseDir: base directory used for resolving relative paths in metadata
+//   - postArgs: additional passthrough arguments
+//
+// Returns:
+//   - []string: arguments to pass to pandoc executable
+//   - string: human-readable quoted command string
+func buildPandocCommand(inputFile, outputFile, fmtStr string, metaOut map[string]any, baseDir string, postArgs []string) ([]string, string) {
+	resolvedMetaOut := pandoc.ResolveMetadataPaths(metaOut, baseDir)
+
+	pandocArgs := []string{inputFile}
+	pandocArgs = append(pandocArgs, "--to", fmtStr)
+	pandocArgs = append(pandocArgs, "--output", outputFile)
+	pandocArgs = append(pandocArgs, pandoc.GetArgs(resolvedMetaOut)...)
+
+	// Normalize shorthand '-t' to '--to' to avoid ambiguity when passed alongside target definitions.
+	normalizedPostArgs := make([]string, len(postArgs))
+	copy(normalizedPostArgs, postArgs)
+	for i := 0; i < len(normalizedPostArgs); i++ {
+		if normalizedPostArgs[i] == "-t" {
+			normalizedPostArgs[i] = "--to"
+		}
+	}
+	pandocArgs = append(pandocArgs, normalizedPostArgs...)
+
+	// Quote arguments containing spaces or quotes for unambiguous logging and display.
+	var quotedArgs []string
+	for _, arg := range pandocArgs {
+		if strings.Contains(arg, " ") || strings.Contains(arg, "\"") {
+			quotedArgs = append(quotedArgs, fmt.Sprintf("%q", arg))
+		} else {
+			quotedArgs = append(quotedArgs, arg)
+		}
+	}
+	cmdStr := ToolPandoc + " " + strings.Join(quotedArgs, " ")
+	return pandocArgs, cmdStr
+}
+
+// executePandoc runs the pandoc command using the executor and formats error output on failure.
+//
+// Parameters:
+//   - ctx: context for cancellation
+//   - executor: command runner implementation
+//   - pandocArgs: arguments passed to pandoc
+//
+// Returns:
+//   - error: an error with formatted stderr diagnostics if execution fails
+func executePandoc(ctx context.Context, executor CommandExecutor, pandocArgs []string) error {
+	var stderrBuf strings.Builder
+	stderrWriter := io.MultiWriter(os.Stderr, &stderrBuf)
+
+	if err := executor.Run(ctx, ToolPandoc, pandocArgs, os.Stdout, stderrWriter); err != nil {
+		// Extract up to the last 5 lines of stderr because TeX engines often produce extensive output where the actual error is at the end.
+		errMsg := err.Error()
+		if stderrStr := strings.TrimSpace(stderrBuf.String()); stderrStr != "" {
+			lines := strings.Split(stderrStr, "\n")
+			if len(lines) > 5 {
+				errMsg = strings.Join(lines[len(lines)-5:], "\n")
+			} else {
+				errMsg = stderrStr
+			}
+		}
+		_, _ = fmt.Fprintln(os.Stderr) // Separator
+		return fmt.Errorf("an error occurred running the pandoc command: %s", errMsg)
+	}
+	return nil
 }
 
 // parseArgs determines the input files and trailing Pandoc arguments from CLI args.
@@ -495,6 +620,11 @@ func DetermineTargets(opts options.Options, cfg *config.Config) []string {
 	if len(opts.Targets) > 0 {
 		return opts.Targets
 	}
+
+	if cfg == nil {
+		return []string{DefaultFormat}
+	}
+
 	// User clarification: "It is all formats in the YAML header metadata block at the top of the input Markdown file."
 	// This means if --all is passed (or default behavior), we should look at 'outputs' and 'output' in the YAML.
 
@@ -521,7 +651,7 @@ func DetermineTargets(opts options.Options, cfg *config.Config) []string {
 	}
 
 	// Fallback to auto detection or default
-	return []string{"html"}
+	return []string{DefaultFormat}
 }
 
 // isOverwriteAllowed checks if overwrite is explicitly allowed in configuration.
@@ -533,16 +663,18 @@ func DetermineTargets(opts options.Options, cfg *config.Config) []string {
 // Returns:
 //   - bool: true if overwrite is allowed, false otherwise
 func isOverwriteAllowed(cfg *config.Config, metaOut map[string]any) bool {
-	// Check specific target config
-	if v, ok := metaOut["overwrite"]; ok {
-		if b, ok := v.(bool); ok && b {
-			return true
+	if metaOut != nil {
+		if v, ok := metaOut["overwrite"]; ok {
+			if b, ok := v.(bool); ok && b {
+				return true
+			}
 		}
 	}
-	// Check global config
-	if v, ok := cfg.Generic["overwrite"]; ok {
-		if b, ok := v.(bool); ok && b {
-			return true
+	if cfg != nil && cfg.Generic != nil {
+		if v, ok := cfg.Generic["overwrite"]; ok {
+			if b, ok := v.(bool); ok && b {
+				return true
+			}
 		}
 	}
 	return false
@@ -570,6 +702,29 @@ func askForConfirmation(filename string, r io.Reader, w io.Writer) bool {
 	return response == "y" || response == "yes"
 }
 
+// resolvePDFEngine returns the configured or default PDF engine for a target metadata map.
+//
+// Parameters:
+//   - metaOut: target-specific metadata map (optional)
+//   - generic: generic metadata map (optional)
+//
+// Returns:
+//   - string: the name of the PDF engine (e.g. "pdflatex", "tectonic", "xelatex")
+func resolvePDFEngine(metaOut map[string]any, generic map[string]any) string {
+	engine := DefaultPDFEngine
+	if metaOut != nil {
+		if e, ok := metaOut["pdf-engine"].(string); ok && e != "" {
+			engine = e
+		}
+	}
+	if engine == DefaultPDFEngine && generic != nil {
+		if e, ok := generic["pdf-engine"].(string); ok && e != "" {
+			engine = e
+		}
+	}
+	return engine
+}
+
 // GetRequiredTools determines which tools are needed for the given input file.
 //
 // Parameters:
@@ -579,10 +734,8 @@ func askForConfirmation(filename string, r io.Reader, w io.Writer) bool {
 // Returns:
 //   - []string: list of tool names that should be checked (e.g. "pandoc", "pdflatex")
 //   - error: an error if the input file cannot be read
-//
-//nolint:gocyclo // Code is complex but manageable; refactoring deferred
 func GetRequiredTools(inputFile string, opts options.Options) ([]string, error) {
-	required := []string{"pandoc"}
+	required := []string{ToolPandoc}
 
 	// If no input file, return basic set + all known engines?
 	// The requirement was: if no file, check all.
@@ -608,91 +761,24 @@ func GetRequiredTools(inputFile string, opts options.Options) ([]string, error) 
 
 	// Load default config to fill in gaps if possible, mostly for output map
 	_, defaultCfg, _ := config.LoadDefaultConfig("default")
-	if defaultCfg != nil {
-		if cfg.OutputMap == nil {
-			cfg.OutputMap = defaultCfg.OutputMap
-		} else {
-			for k, v := range defaultCfg.OutputMap {
-				if _, exists := cfg.OutputMap[k]; !exists {
-					cfg.OutputMap[k] = v
-				}
-			}
-		}
-		if cfg.Generic == nil {
-			cfg.Generic = make(map[string]any)
-		}
-		if defaultCfg.Generic != nil {
-			for k, v := range defaultCfg.Generic {
-				if _, exists := cfg.Generic[k]; !exists {
-					cfg.Generic[k] = v
-				}
-			}
-		}
-	}
+	mergeDefaultConfig(cfg, defaultCfg)
 
 	targets := DetermineTargets(opts, cfg)
-
 	hasTypst := false
 
 	for _, t := range targets {
-		// Normalize format
-		fmtStr := pandoc.NormalizeFormat(t)
-
-		// Check for overrides in config to fully resolve format (e.g. target "paper" might be "latex" or "typst")
-		var metaOut map[string]any
-		if val, ok := cfg.OutputMap[t]; ok {
-			if m, ok := val.(map[string]any); ok {
-				metaOut = m
-				if to, ok := m["to"].(string); ok && to != "" {
-					fmtStr = to
-				}
-			}
-		} else if val, ok := cfg.Generic[t]; ok {
-			if m, ok := val.(map[string]any); ok {
-				metaOut = m
-			}
-		}
+		fmtStr, metaOut := resolveTargetConfig(t, cfg)
 
 		if fmtStr == "typst" {
 			hasTypst = true
 		}
 		if fmtStr == "pdf" || fmtStr == "latex" || fmtStr == "beamer" || fmtStr == "context" {
-			// It's a PDF-generative format (via Latex/ConTeXt usually, or via pdf-engine)
-			// Actually pandoc supports outputting pdf from many things directly via engine.
-			// Ideally we check if 'pdf-engine' is set for this target or globally.
-
-			engine := "pdflatex" // default
-			if metaOut != nil {
-				if e, ok := metaOut["pdf-engine"].(string); ok && e != "" {
-					engine = e
-				}
-			}
-			if engine == "pdflatex" {
-				// Check global defaults if not set in target
-				if e, ok := cfg.Generic["pdf-engine"].(string); ok && e != "" {
-					engine = e
-				}
-			}
-
-			// Only set pdfEngine if not already found (or maybe collect all unique engines?)
-			// For simplicity let's assume one engine for now or collect them.
-			// Let's rely on checking logic.
-
-			// We effectively want to check this engine.
-			// Since we might have multiple targets with different engines, let's just append to required directly?
-			// But for "hasPDF" logic let's keep it simple.
-			// Actually, let's just add it to a set.
+			engine := resolvePDFEngine(metaOut, cfg.Generic)
 			if !contains(required, engine) {
 				required = append(required, engine)
 			}
 		}
 	}
-
-	// "pdf" format in pandoc implies using a pdf-engine.
-	// If one of the targets effectively results in a PDF via latex/etc, we have added the engine above.
-	// Logic above:
-	// 1. Normalize format (e.g. "pdf" remains "pdf").
-	// 2. If format is "pdf", pandoc uses default engine (pdflatex) unless specified.
 
 	if hasTypst && !contains(required, "typst") {
 		required = append(required, "typst")

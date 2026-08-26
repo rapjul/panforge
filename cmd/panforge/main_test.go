@@ -2,84 +2,48 @@ package main
 
 import (
 	"bytes"
-	"errors"
-	"strings"
 	"testing"
-
-	"github.com/rapjul/panforge/internal/utils"
 )
 
-// TestPrintToolCheckRow_Table verifies formatting and status calculation for tool check results.
-func TestPrintToolCheckRow_Table(t *testing.T) {
+// TestFormatVersion tests version string formatting for development and release builds.
+func TestFormatVersion(t *testing.T) {
 	tests := []struct {
-		name         string
-		res          utils.CheckResult
-		wantFound    bool
-		wantContains []string
+		name     string
+		v        string
+		commit   string
+		expected string
 	}{
 		{
-			name: "Found tool with short version",
-			res: utils.CheckResult{
-				Name:    "pandoc",
-				Found:   true,
-				Version: "pandoc 3.1.2",
-			},
-			wantFound:    true,
-			wantContains: []string{"pandoc", "FOUND", "pandoc 3.1.2"},
+			name:     "Dev build with commit hash",
+			v:        "dev",
+			commit:   "abc1234",
+			expected: "dev (commit: abc1234)",
 		},
 		{
-			name: "Found tool with long version string (truncated)",
-			res: utils.CheckResult{
-				Name:    "pdflatex",
-				Found:   true,
-				Version: "pdfTeX 3.141592653-2.6-1.40.26 (TeX Live 2024) (preloaded format=pdflatex 2024.3.12) kpathsea version 6.4.0",
-			},
-			wantFound:    true,
-			wantContains: []string{"pdflatex", "FOUND", "..."},
+			name:     "Dev build with none commit",
+			v:        "dev",
+			commit:   "none",
+			expected: "dev (commit: none)",
 		},
 		{
-			name: "Found tool with path only",
-			res: utils.CheckResult{
-				Name:  "tectonic",
-				Found: true,
-				Path:  "/usr/local/bin/tectonic",
-			},
-			wantFound:    true,
-			wantContains: []string{"tectonic", "FOUND", "/usr/local/bin/tectonic"},
+			name:     "Tagged release version",
+			v:        "v1.0.0",
+			commit:   "abc1234",
+			expected: "v1.0.0",
 		},
 		{
-			name: "Missing tool with error",
-			res: utils.CheckResult{
-				Name:  "xelatex",
-				Found: false,
-				Error: errors.New("executable file not found in $PATH"),
-			},
-			wantFound:    false,
-			wantContains: []string{"xelatex", "MISSING", "executable file not found in $PATH"},
-		},
-		{
-			name: "Missing tool without error",
-			res: utils.CheckResult{
-				Name:  "typst",
-				Found: false,
-			},
-			wantFound:    false,
-			wantContains: []string{"typst", "MISSING", "not found"},
+			name:     "Semver version string",
+			v:        "0.2.1",
+			commit:   "",
+			expected: "0.2.1",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var buf bytes.Buffer
-			gotFound := printToolCheckRow(&buf, tt.res)
-			if gotFound != tt.wantFound {
-				t.Errorf("printToolCheckRow() returned found = %v, want %v", gotFound, tt.wantFound)
-			}
-			out := buf.String()
-			for _, exp := range tt.wantContains {
-				if !strings.Contains(out, exp) {
-					t.Errorf("Output %q does not contain expected substring %q", out, exp)
-				}
+			got := formatVersion(tt.v, tt.commit)
+			if got != tt.expected {
+				t.Errorf("formatVersion(%q, %q) = %q, want %q", tt.v, tt.commit, got, tt.expected)
 			}
 		})
 	}

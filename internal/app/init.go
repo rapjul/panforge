@@ -25,7 +25,7 @@ type InitOptions struct {
 }
 
 // KnownFormats are the formats supported by the scaffold generator.
-var KnownFormats = []string{"html", "pdf", "epub", "docx"}
+var KnownFormats = []string{DefaultFormat, "pdf", "epub", "docx"}
 
 // RunInit executes the init command logic.
 //
