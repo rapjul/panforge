@@ -37,8 +37,12 @@ linters:
     gosec:
       excludes:
         - G104 # duplicate of errcheck
-    goconst:
-      ignore-tests: true
+
+  exclusions:
+    rules:
+      - path: _test\.go
+        linters:
+          - goconst
 
 issues:
   # disable limits on issue reporting
