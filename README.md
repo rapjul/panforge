@@ -34,51 +34,68 @@ go install ./cmd/panforge
 To quickly get started with a new file or configuration:
 
 ```bash
-# Generate a sample Markdown file with YAML frontmatter
+# Generate a sample Markdown file with YAML frontmatter (default: input.md)
 panforge init --markdown
 
-# OR generate a default config file
+# OR
+panforge init -m
+
+# Generate a sample Markdown file with a custom filename
+panforge init -m chapter1.md
+
+# OR generate a default config file in the current directory (default: .panforge.yaml)
 panforge init --config
 
-# Generate a sample Markdown file to convert to specific output formats
+# Generate a sample Markdown file configured for specific output formats
 panforge init -m -t pdf,docx
 ```
 
 ### Running Conversions
 
 ```bash
-panforge [flags] <file>
+# Convert a single file
+panforge input.md
+
+# Batch convert multiple files
+panforge doc1.md doc2.md
+panforge *.md
+
+# Specify input files explicitly via flags
+panforge -i doc1.md -i doc2.md
 ```
 
-This acts as a transparent wrapper around `pandoc`, reading configuration from the YAML header of `input.md` to determine how to process it.
+This reads configuration from the YAML front-matter of each Markdown file to determine how to process it.
 
 ### Passing Arguments to Pandoc
 
-`panforge` generally passes unknown arguments through to `pandoc`. However, since `panforge` uses some flags (like `-f`/`--force`) that conflict with `pandoc`'s flags (e.g., `-f`/`--from`), strict flag parsing may consume them.
-
-To safely pass flags directly to `pandoc` without interference, use the `--` separator:
+To safely pass arbitrary flags directly to `pandoc` without interference, use the POSIX `--` separator:
 
 ```bash
-# Correctly pass -f/--from to pandoc
+# Pass input format directly to pandoc
 panforge input.md -- -f markdown
 
-# Pass arbitrary flags
-panforge input.md -- --toc --toc-depth=2
+# Pass arbitrary flags directly to pandoc
+panforge input.md -- --toc --toc-depth=2 --shift-heading-level-by=1
+
+# Batch convert multiple files with passthrough flags
+panforge *.md -- --toc
 ```
 
 ### Command Line Flags
 
-- `-t, --target <format>`: Specifically target one or more output formats defined in the YAML header. Can be used multiple times.
-- `-o, --output <file>`: Override the output filename.
+- `-t, --to <format>`, `--target <format>`: Specifically target one or more output formats defined in the YAML header. Can be used multiple times.
+- `-i, --input <file>`: Explicitly specify one or more input files.
+- `-o, --output <file>`: Override the output filename (supports templates such as `"{title}.{ext}"`).
 - `-a, --all`: Process all formats defined in the YAML header (this is also the default behavior if no targets are specified).
-- `-f, --force`: Force overwrite of existing output files without prompting.
-- `-d, --dry-run`: Print the `pandoc` commands that would be executed without running them.
+- `-F, --force`: Force overwrite of existing output files without prompting.
+- `-n, --dry-run`: Print the `pandoc` commands that would be executed without running them.
 - `-v, --verbose`: Enable verbose logging.
 - `-q, --quiet`: Suppress standard output messages.
-- `-w, --watch`: Watch input file for changes and automatically re-run.
+- `-w, --watch`: Watch input file and configuration for changes and automatically re-run.
+- `-c, --concurrency <num>`: Limit number of concurrent Pandoc processes (default: number of CPUs).
+- `-r, --relative-output`: Resolve relative output paths against CWD instead of input file directory.
 - `--log <file>`: Append logs to the specified file.
-
-To pass arguments directly to the underlying `pandoc` command (not recommended, use the YAML header instead), you can append them after the input file or arguments.
+- `--json`: Output logs in JSON format.
 
 ### Shell Completion
 
@@ -104,7 +121,7 @@ source <(panforge completion zsh)
 panforge completion fish | source
 ```
 
-To load completions for every session, correct the above commands to write to your shell's completion directory or config file (e.g., `~/.bashrc` or `~/.zshrc`).
+To load completions for every session, write the output to your shell's completion directory or config file (e.g., `~/.bashrc` or `~/.zshrc`).
 
 
 
@@ -114,11 +131,12 @@ To load completions for every session, correct the above commands to write to yo
 
 `panforge` looks for configuration files in the following order:
 
-1.  **XDG Specification**: `$XDG_CONFIG_HOME/panforge/` (e.g., `~/.config/panforge/` on Linux/macOS)
-2.  **Windows**: `%APPDATA%/panforge/`
-3.  **Default**: `~/.config/panforge/` (if `XDG_CONFIG_HOME` is unset)
+1.  **Project Level**: `./.panforge.yaml`, `./panforge.yaml`, `./.panforge.yml`, or `./panforge.yml` in the current working directory.
+2.  **XDG Specification**: `$XDG_CONFIG_HOME/panforge/default.yaml` (e.g., `~/.config/panforge/default.yaml` on Linux/macOS).
+3.  **Windows**: `%APPDATA%/panforge/default.yaml`.
+4.  **Default**: `~/.config/panforge/default.yaml` (if `XDG_CONFIG_HOME` is unset).
 
-You can place your `default.yaml` or other config files in this directory.
+You can place your default configuration file in any of these locations to customize fallback templates and Pandoc options across documents.
 
 ### Metadata Configuration
 
@@ -174,7 +192,7 @@ The following rules apply:
 
 ### Global Options
 
-Options at the root of the YAML header are treated as variables or metadata by `panforge` if they match known configuration keys, otherwise they are passed to pandoc as metadata.
+Options at the root of the YAML header are treated as variables or metadata by `panforge` if they match known configuration keys, otherwise they are passed to Pandoc as metadata.
 
 Special keys processed by `panforge`:
 
