@@ -133,6 +133,7 @@ $RECYCLE.BIN/
 
 # Antigravity AI Files & Prompt Cache
 _antigravity/
+_artifacts/
 .chatledger/
 .specstory/
 
