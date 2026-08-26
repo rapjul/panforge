@@ -130,8 +130,8 @@ func TestRun_Stdin(t *testing.T) {
 	}
 }
 
+// TestRun_ExecutionError verifies error propagation when the executor encounters a failure.
 func TestRun_ExecutionError(t *testing.T) {
-	// Verify that if Executor returns error, Run returns error
 	executor := &MockExecutor{ShouldFail: true}
 	opts := options.Options{
 		Targets: []string{"html"},
@@ -149,5 +149,150 @@ func TestRun_ExecutionError(t *testing.T) {
 	err := app.Run(context.Background(), cmd, args, opts, executor)
 	if err == nil {
 		t.Error("Expected app.Run to fail when executor fails, but it succeeded")
+	}
+}
+
+// TestRun_BatchProcessing verifies processing of multiple input files in a single invocation.
+func TestRun_BatchProcessing(t *testing.T) {
+	tmp1, err := os.CreateTemp("", "batch-test-1-*.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Remove(tmp1.Name()) }()
+	_, _ = tmp1.WriteString("# Doc 1\n")
+	_ = tmp1.Close()
+
+	tmp2, err := os.CreateTemp("", "batch-test-2-*.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Remove(tmp2.Name()) }()
+	_, _ = tmp2.WriteString("# Doc 2\n")
+	_ = tmp2.Close()
+
+	executor := &TestExecutor{}
+	opts := options.Options{
+		DryRun:  true,
+		Targets: []string{"html"},
+	}
+
+	cmd := &cobra.Command{}
+	cmd.SetOut(io.Discard)
+	cmd.SetErr(io.Discard)
+
+	args := []string{tmp1.Name(), tmp2.Name()}
+	err = app.Run(context.Background(), cmd, args, opts, executor)
+	if err != nil {
+		t.Fatalf("app.Run failed in batch mode: %v", err)
+	}
+}
+
+// TestRun_BatchProcessing_FixedOutputError verifies error on fixed output filename with multiple inputs.
+func TestRun_BatchProcessing_FixedOutputError(t *testing.T) {
+	executor := &TestExecutor{}
+	opts := options.Options{
+		DryRun:  true,
+		Targets: []string{"html"},
+		Output:  "fixed-output.html", // Fixed output name without template variables
+	}
+
+	cmd := &cobra.Command{}
+	cmd.SetOut(io.Discard)
+	cmd.SetErr(io.Discard)
+
+	args := []string{"doc1.md", "doc2.md"}
+	err := app.Run(context.Background(), cmd, args, opts, executor)
+	if err == nil {
+		t.Error("Expected error when using fixed --output with multiple input files, got nil")
+	}
+	if !strings.Contains(err.Error(), "cannot specify a fixed output filename") {
+		t.Errorf("Unexpected error message: %v", err)
+	}
+}
+
+// TestRun_ExplicitInputFlags verifies inputs provided through --input / -i flag.
+func TestRun_ExplicitInputFlags(t *testing.T) {
+	tmp, err := os.CreateTemp("", "flag-test-*.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Remove(tmp.Name()) }()
+	_, _ = tmp.WriteString("# Doc via Flag\n")
+	_ = tmp.Close()
+
+	executor := &TestExecutor{}
+	opts := options.Options{
+		DryRun:  true,
+		Targets: []string{"html"},
+		Inputs:  []string{tmp.Name()},
+	}
+
+	cmd := &cobra.Command{}
+	cmd.SetOut(io.Discard)
+	cmd.SetErr(io.Discard)
+
+	err = app.Run(context.Background(), cmd, []string{}, opts, executor)
+	if err != nil {
+		t.Fatalf("app.Run failed with explicit inputs flag: %v", err)
+	}
+}
+
+// TestRun_NoInputFile verifies handling when no input files are specified.
+func TestRun_NoInputFile(t *testing.T) {
+	executor := &TestExecutor{}
+	opts := options.Options{
+		Targets: []string{"html"},
+	}
+
+	cmd := &cobra.Command{}
+	cmd.SetOut(io.Discard)
+	cmd.SetErr(io.Discard)
+
+	err := app.Run(context.Background(), cmd, []string{}, opts, executor)
+	if err == nil {
+		t.Error("Expected error when no input file is found with targets set, got nil")
+	}
+}
+
+// TestRun_FlagsAndOptions verifies execution with logging, concurrency, relative output, and verbose flags.
+func TestRun_FlagsAndOptions(t *testing.T) {
+	tmpFile, err := os.CreateTemp("", "flags-test-*.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Remove(tmpFile.Name()) }()
+	_, _ = tmpFile.WriteString("# Document with Flags\n")
+	_ = tmpFile.Close()
+
+	logFile, err := os.CreateTemp("", "panforge-test-*.log")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Remove(logFile.Name()) }()
+	_ = logFile.Close()
+
+	executor := &TestExecutor{}
+	opts := options.Options{
+		DryRun:         true,
+		Targets:        []string{"html"},
+		Log:            logFile.Name(),
+		Concurrency:    2,
+		RelativeOutput: true,
+		Verbose:        true,
+	}
+
+	cmd := &cobra.Command{}
+	cmd.SetOut(io.Discard)
+	cmd.SetErr(io.Discard)
+
+	err = app.Run(context.Background(), cmd, []string{tmpFile.Name()}, opts, executor)
+	if err != nil {
+		t.Fatalf("app.Run failed with flags and options: %v", err)
+	}
+
+	// Verify log file content
+	logContent, _ := os.ReadFile(logFile.Name())
+	if !strings.Contains(string(logContent), "panforge calling: pandoc") {
+		t.Errorf("Expected log file to contain command call, got: %s", string(logContent))
 	}
 }

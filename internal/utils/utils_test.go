@@ -78,3 +78,15 @@ func TestSanitizeFilename(t *testing.T) {
 		})
 	}
 }
+
+// TestFormatDate verifies formatting of the current date.
+func TestFormatDate(t *testing.T) {
+	d := FormatDate()
+	if len(d) != 10 { // YYYY-MM-DD
+		t.Errorf("FormatDate() = %q, expected YYYY-MM-DD format (10 chars)", d)
+	}
+	parts := strings.Split(d, "-")
+	if len(parts) != 3 {
+		t.Errorf("FormatDate() = %q, expected 3 hyphen-separated parts", d)
+	}
+}

@@ -32,12 +32,14 @@ func TestCheckPDFEngine(t *testing.T) {
 	_ = utils.CheckPDFEngine("pdflatex")
 }
 
+// TestCheckOptionalTool tests the warning check for optional tools.
 func TestCheckOptionalTool(t *testing.T) {
 	// Should log warning if missing but not fail/panic
-	// We capture stdout/stderr? The function just prints to fmt.Printf usually or logger?
-	// The current implementation might print to stdout.
-	// For now, simple execution for coverage.
-
-	// If it doesn't exist, it prints "Warning: ... not found"
 	utils.CheckOptionalTool("non_existent_tool_abc")
+}
+
+// TestCheckTypst verifies CheckTypst function execution.
+func TestCheckTypst(t *testing.T) {
+	// Should return boolean without panic
+	_ = utils.CheckTypst()
 }

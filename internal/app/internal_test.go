@@ -1,6 +1,9 @@
 package app
 
 import (
+	"bytes"
+	"context"
+	"strings"
 	"testing"
 
 	"github.com/rapjul/panforge/internal/config"
@@ -123,5 +126,79 @@ func TestIsOverwriteAllowed(t *testing.T) {
 				t.Errorf("isOverwriteAllowed() = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+// TestAskForConfirmation verifies interactive prompt responses.
+func TestAskForConfirmation(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected bool
+	}{
+		{"yes lowercase", "y\n", true},
+		{"yes word", "yes\n", true},
+		{"yes uppercase", "Y\n", true},
+		{"no lowercase", "n\n", false},
+		{"no word", "no\n", false},
+		{"empty input", "\n", false},
+		{"random text", "maybe\n", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := strings.NewReader(tt.input)
+			var w bytes.Buffer
+			got := askForConfirmation("test.html", r, &w)
+			if got != tt.expected {
+				t.Errorf("askForConfirmation(%q) = %v, want %v", tt.input, got, tt.expected)
+			}
+		})
+	}
+}
+
+// TestRealExecutor verifies execution with dry-run on and off.
+func TestRealExecutor(t *testing.T) {
+	dryExec := &RealExecutor{DryRun: true}
+	var out, errBuf bytes.Buffer
+	if err := dryExec.Run(context.Background(), "echo", []string{"hello"}, &out, &errBuf); err != nil {
+		t.Errorf("DryRun RealExecutor failed: %v", err)
+	}
+
+	realExec := &RealExecutor{DryRun: false}
+	if err := realExec.Run(context.Background(), "go", []string{"version"}, &out, &errBuf); err != nil {
+		t.Errorf("RealExecutor Run failed: %v", err)
+	}
+}
+
+// TestParseArgs_Direct verifies argument parsing logic across diverse flag and dash combinations.
+func TestParseArgs_Direct(t *testing.T) {
+	// Case 1: Simple input file
+	inputs, post := parseArgs(nil, []string{"doc.md"}, nil)
+	if len(inputs) != 1 || inputs[0] != "doc.md" || len(post) != 0 {
+		t.Errorf("parseArgs simple failed: inputs=%v, post=%v", inputs, post)
+	}
+
+	// Case 2: Multiple input files and post flags
+	inputs, post = parseArgs(nil, []string{"doc1.md", "doc2.md", "-t", "html"}, []string{"extra.md"})
+	if len(inputs) != 3 || len(post) != 2 {
+		t.Errorf("parseArgs multi failed: inputs=%v, post=%v", inputs, post)
+	}
+
+	// Case 3: Stdin
+	inputs, post = parseArgs(nil, []string{"-"}, nil)
+	if len(inputs) != 1 || inputs[0] != "-" {
+		t.Errorf("parseArgs stdin failed: inputs=%v, post=%v", inputs, post)
+	}
+}
+
+// TestContains verifies string slice membership checking.
+func TestContains(t *testing.T) {
+	slice := []string{"pandoc", "xelatex", "typst"}
+	if !contains(slice, "pandoc") {
+		t.Error("contains() returned false for existing item")
+	}
+	if contains(slice, "nonexistent") {
+		t.Error("contains() returned true for nonexistent item")
 	}
 }

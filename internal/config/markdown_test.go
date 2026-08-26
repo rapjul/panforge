@@ -31,7 +31,7 @@ date: 2023-01-01
 
 	_, cfg, err := LoadConfig(tmpfile.Name())
 	if err != nil {
-		t.Fatalf("LoadConfig failed on markdown file: %v", err)
+		t.Fatalf("LoadConfig failed on Markdown file: %v", err)
 	}
 
 	if cfg.Title != "My Story" {

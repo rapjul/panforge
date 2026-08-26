@@ -70,4 +70,34 @@ func TestRunInit(t *testing.T) {
 			t.Errorf("file was not overwritten")
 		}
 	})
+
+	t.Run("CustomFilename_Scaffold", func(t *testing.T) {
+		err := RunInit(InitOptions{Markdown: true, Filename: "custom-doc.md"})
+		if err != nil {
+			t.Fatalf("RunInit failed with custom filename: %v", err)
+		}
+
+		content, err := os.ReadFile("custom-doc.md")
+		if err != nil {
+			t.Fatalf("custom-doc.md not created")
+		}
+		if !strings.Contains(string(content), "title: \"Untitled Document\"") {
+			t.Errorf("unexpected content in custom scaffold file")
+		}
+	})
+
+	t.Run("CustomFilename_Config", func(t *testing.T) {
+		err := RunInit(InitOptions{Config: true, Filename: "custom-config.yaml"})
+		if err != nil {
+			t.Fatalf("RunInit failed with custom config filename: %v", err)
+		}
+
+		content, err := os.ReadFile("custom-config.yaml")
+		if err != nil {
+			t.Fatalf("custom-config.yaml not created")
+		}
+		if !strings.Contains(string(content), "Default Configuration for panforge") {
+			t.Errorf("unexpected content in custom config file")
+		}
+	})
 }

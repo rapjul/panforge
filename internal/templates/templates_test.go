@@ -27,7 +27,7 @@ func TestGetScaffoldTemplate(t *testing.T) {
 	if tmpl == "" {
 		t.Error("GetScaffoldTemplate() returned empty string")
 	}
-	// Verify it contains markdown header
+	// Verify it contains Markdown header
 	// note: checking for {{ . }} or known static content
 	if !strings.Contains(tmpl, "title: \"Untitled Document\"") {
 		t.Error("GetScaffoldTemplate() missing expected content 'title: \"Untitled Document\"'")
