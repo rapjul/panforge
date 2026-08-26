@@ -3,16 +3,25 @@
     ".yamlfmt": "yaml"
   },
   "files.exclude": {
-    "_*": true,
+    "_*": false,
     ".chatledger": true,
     ".goreleaser.yaml": false,
     ".yamlfmt": false,
     ".vscode": false,
-    "vendor": true
+    "vendor": true,
+    "_artifacts": false,
+    "_antigravity": false,
+    ".specstory": true,
+    "dist": false,
+    ".devcontainer": true,
+    "coverage.out": true,
+    "coverage": true
   },
-  "explorer.excludeGitIgnore": true,
+  "explorer.excludeGitIgnore": false,
   "chatledger.exportDirectory": ".chatledger",
   "chatledger.enabled": true,
   "makefile.configureOnOpen": false,
-  "cSpell.words": ["golangci"]
+  "cSpell.words": [
+    "golangci"
+  ]
 }
